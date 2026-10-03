@@ -183,6 +183,8 @@ ex:threshold      a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:comment "�
 ex:threshold_unit a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:range xsd:string .
 ex:comparison     a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:range xsd:string ;
     rdfs:comment "測定値と閾値の比較方向。gt(>) / ge(>=) / lt(<) / le(<=)。判定クエリはこの値で分岐する"@ja .
+ex:min_denominator a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:range xsd:integer ;
+    rdfs:comment "比率判定の最小標本数。分母（observedDenominator）がこれ未満なら判定しない"@ja .
 ex:numerator_label   a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:range xsd:string ;
     rdfs:comment "Evidence の observedNumerator が何を数えた値か（比率・日数・件数のルールのみ）"@ja .
 ex:denominator_label a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:range xsd:string ;
@@ -213,3 +215,63 @@ ex:explanation    a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:range 
 #     ex:evidenceFact data:lot_parts/LP003 , data:purchase/PU006 , data:supplier/S005 ;
 #     ex:observedValue 0.67 ; ex:conclusion "要注意" ;
 #     ex:evaluatedAt "2026-09-17T10:00:00"^^xsd:dateTime .
+
+# ---------------------------------------------------------------------
+# 説明文生成用の文型（src/llm.py が三つ組を日本語の文にするときに使う）
+# データタイププロパティには、三つ組の述語として表示する rdfs:label もここで付ける。
+# {s} = 主語ノードの表示名、{o} = 目的語ノードの表示名またはリテラル値。
+# 説明文に渡す三つ組は、根拠経路に実在するトリプルと、その文型で作った文だけで構成する。
+# ---------------------------------------------------------------------
+ex:sentenceTemplate a owl:AnnotationProperty ;
+    rdfs:label "文型"@ja ;
+    rdfs:comment "三つ組（主語・述語・目的語）を日本語の文にするための型。{s} と {o} を置き換える"@ja .
+
+# Evidence と根拠ノードの関係
+ex:evidenceSubject     ex:sentenceTemplate "{s} は {o} を判定対象とする"@ja .
+ex:evidenceRule        ex:sentenceTemplate "{s} は {o} を適用ルールとする"@ja .
+ex:evidenceFact        ex:sentenceTemplate "{s} は {o} を根拠事実とする"@ja .
+ex:alternativePart     ex:sentenceTemplate "{s} は {o} を代替部品とする"@ja .
+ex:alternativeSupplier ex:sentenceTemplate "{s} は {o} を代替サプライヤーとする"@ja .
+ex:conclusion          rdfs:label "結論"@ja ; ex:sentenceTemplate "{s} の結論は {o}"@ja .
+ex:observedValue       rdfs:label "測定値"@ja ; ex:sentenceTemplate "{s} の測定値は {o}"@ja .
+ex:appliedThreshold    rdfs:label "適用閾値"@ja ; ex:sentenceTemplate "{s} に適用した閾値は {o}"@ja .
+ex:undeterminedReason  rdfs:label "判定不能の理由"@ja ; ex:sentenceTemplate "{s} は「{o}」のため判定できなかった"@ja .
+
+# 根拠経路に現れるオブジェクトプロパティ
+ex:hasSpec             ex:sentenceTemplate "{s} は {o} を持つ"@ja .
+ex:partSuppliedBy      ex:sentenceTemplate "{s} は {o} から供給される"@ja .
+ex:purchasedPart       ex:sentenceTemplate "{s} は {o} を購買した"@ja .
+ex:purchasedFrom       ex:sentenceTemplate "{s} は {o} から購買された"@ja .
+ex:consumedInLot       ex:sentenceTemplate "{s} は {o} で消費された"@ja .
+ex:consumedPurchase    ex:sentenceTemplate "{s} は {o} の部品を消費した"@ja .
+ex:lotUsesSupplier     ex:sentenceTemplate "{s} は {o} の部品を使用した"@ja .
+ex:lotMadeOn           ex:sentenceTemplate "{s} は {o} で製造された"@ja .
+ex:lotProduct          ex:sentenceTemplate "{s} は {o} のロットである"@ja .
+ex:opLot               ex:sentenceTemplate "{s} は {o} の工程である"@ja .
+ex:opEquipment         ex:sentenceTemplate "{s} は {o} で行われた"@ja .
+ex:maintainedEquipment ex:sentenceTemplate "{s} は {o} に対して行われた"@ja .
+ex:inspectedLot        ex:sentenceTemplate "{s} は {o} を検査した"@ja .
+ex:inspectedSpec       ex:sentenceTemplate "{s} は {o} に照らして判定された"@ja .
+
+# 根拠ノードの属性（説明文に渡すもの）
+ex:start_date          rdfs:label "製造開始日"@ja ; ex:sentenceTemplate "{s} の製造開始日は {o}"@ja .
+ex:started_at          rdfs:label "工程開始日時"@ja ; ex:sentenceTemplate "{s} の開始日時は {o}"@ja .
+ex:maint_interval_days rdfs:label "保全間隔（日）"@ja ; ex:sentenceTemplate "{s} の保全間隔は {o} 日"@ja .
+ex:maint_date          rdfs:label "保全実施日"@ja ; ex:sentenceTemplate "{s} の実施日は {o}"@ja .
+ex:maint_type          rdfs:label "保全種別"@ja ; ex:sentenceTemplate "{s} の保全種別は {o}"@ja .
+ex:measured_value      rdfs:label "測定値"@ja ; ex:sentenceTemplate "{s} の測定値は {o}"@ja .
+ex:result              rdfs:label "検査結果"@ja ; ex:sentenceTemplate "{s} の結果は {o}"@ja .
+ex:inspected_at        rdfs:label "検査日時"@ja ; ex:sentenceTemplate "{s} の検査日時は {o}"@ja .
+ex:parameter           rdfs:label "検査パラメータ"@ja ; ex:sentenceTemplate "{s} の検査パラメータは {o}"@ja .
+ex:min_value           rdfs:label "下限"@ja ; ex:sentenceTemplate "{s} の下限は {o}"@ja .
+ex:max_value           rdfs:label "上限"@ja ; ex:sentenceTemplate "{s} の上限は {o}"@ja .
+ex:unit                rdfs:label "単位"@ja ; ex:sentenceTemplate "{s} の単位は {o}"@ja .
+ex:rating              rdfs:label "評価"@ja ; ex:sentenceTemplate "{s} の評価は {o}"@ja .
+ex:part_type           rdfs:label "部品種別"@ja ; ex:sentenceTemplate "{s} の部品種別は {o}"@ja .
+
+# ルールの属性
+ex:rule_name           rdfs:label "ルール名"@ja ; ex:sentenceTemplate "{s} の名称は {o}"@ja .
+ex:description         rdfs:label "ルールの内容"@ja ; ex:sentenceTemplate "{s} の内容は「{o}」"@ja .
+ex:threshold           rdfs:label "閾値"@ja ; ex:sentenceTemplate "{s} の閾値は {o}"@ja .
+ex:comparison          rdfs:label "比較方向"@ja ; ex:sentenceTemplate "{s} の比較方向は {o}"@ja .
+ex:min_denominator     rdfs:label "最小標本数"@ja ; ex:sentenceTemplate "{s} の最小標本数は {o}"@ja .

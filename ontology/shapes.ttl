@@ -90,7 +90,8 @@ ex:RuleShape a sh:NodeShape ; sh:targetClass ex:Rule ;
     sh:property [ sh:path ex:rule_id ; sh:minCount 1 ; sh:maxCount 1 ] ,
                 [ sh:path ex:description ; sh:minCount 1 ] ,
                 [ sh:path ex:conclusion ; sh:minCount 1 ] ,
-                [ sh:path ex:comparison ; sh:maxCount 1 ; sh:in ( "gt" "ge" "lt" "le" ) ] .
+                [ sh:path ex:comparison ; sh:maxCount 1 ; sh:in ( "gt" "ge" "lt" "le" ) ] ,
+                [ sh:path ex:min_denominator ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 1 ] .
 
 # 説明層: 結論には必ずルールと1件以上の根拠が付き、根拠事実は評価時点より前の日付を持つ
 ex:EvidenceShape a sh:NodeShape ; sh:targetClass ex:Evidence ;

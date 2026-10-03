@@ -14,6 +14,7 @@ from pathlib import Path
 import anthropic
 import pandas as pd
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 import evidence
 import fuseki
@@ -41,11 +42,14 @@ EXPLAIN_ATTRS = {
     "R01": set(),
     "R02": {"start_date", "started_at", "maint_interval_days", "maint_date", "maint_type"},
     "R03": {"measured_value", "result", "inspected_at", "parameter", "min_value", "max_value", "unit"},
-    "R05": {"rating", "parameter"},  # 現行サプライヤーの評価（R04 の判定根拠）と規格のパラメータ
+    "R05": {"rating", "parameter", "part_type"},  # 評価（R04 の判定根拠）・規格のパラメータ・部品種別
 }
 
 # prompts/evidence_to_text.md の制約（推測・断定回避・提案の禁止）に反する表現
 HEDGES = ["思われ", "可能性", "推測", "考えられ", "おそらく", "かもしれ", "見られ", "恐れ", "推奨", "べき", "対策"]
+
+# ルールの比較方向（comparison の値）の読み
+COMPARISON_JA = {"gt": "閾値を超える", "ge": "閾値以上", "lt": "閾値未満", "le": "閾値以下"}
 
 # 判定不能を「該当なし」と読み替える表現。payload に入るのは該当か判定不能だけなので、常に誤り
 NOT_APPLICABLE = ["該当なし", "該当しない", "該当せず", "非該当", "問題なし", "問題ない"]
@@ -80,61 +84,109 @@ def compact(value):
     return value
 
 
-def evidence_payload(detail: pd.DataFrame, edges: pd.DataFrame, props: pd.DataFrame) -> dict:
-    """evidence_detail / evidence_edges / evidence_node_props の結果を判定単位の JSON に組み替える（値は無加工）。
+def vocabulary() -> dict[str, dict]:
+    """スキーマのクラス・プロパティ（ローカル名）→ 日本語ラベルと文型（ex:sentenceTemplate）。"""
+    df = fuseki.select(fuseki.load_query("llm_vocabulary.rq"))
+    return {t.rsplit("#", 1)[-1]: {"label": lab, "template": tpl}
+            for t, lab, tpl in zip(df.term, df.label, df.template)}
 
-    判定は結論の重い順（evidence.CONCLUSION_ORDER）に並べる。分子・分母は Rule のラベルと対にして渡し、
-    ラベルに無い意味づけ（「件」への読み替えなど）を Claude にさせない。
+
+def _clean(v):
+    return None if v is None or (isinstance(v, float) and pd.isna(v)) else v
+
+
+class _TripleBuilder:
+    """根拠を（主語・述語・目的語）の三つ組の一覧にする。述語は日本語ラベル、文はスキーマの文型で作る。"""
+
+    def __init__(self, vocab: dict[str, dict]):
+        self.vocab = vocab
+        self.labels: dict[str, str] = {}
+        self.triples: list[dict] = []
+        self._seen: set[tuple] = set()
+
+    def name_node(self, iri: str, cls: str | None, name: str | None) -> str:
+        """表示名「<クラス名><ID>（<名前>）」。例: 部品PT013（モーター 13）"""
+        if iri not in self.labels:
+            cls_label = self.vocab.get(viz.local(cls or ""), {}).get("label") or ""
+            self.labels[iri] = f"{cls_label}{viz.local(iri)}" + (f"（{name}）" if _clean(name) else "")
+        return self.labels[iri]
+
+    def add(self, s: str, prop: str, o, label: str | None = None) -> None:
+        """prop はプロパティのローカル名。label を渡すとラベル・文型の代わりに「{s} の {label} は {o}」を使う。"""
+        o = _clean(o)
+        if o is None or (s, prop, label, o) in self._seen:
+            return
+        self._seen.add((s, prop, label, o))
+        v = self.vocab.get(prop, {})
+        pred = label or _clean(v.get("label")) or prop
+        template = "{s} の " + label + " は {o}" if label else (_clean(v.get("template")) or "{s} の " + pred + " は {o}")
+        o_text = self.labels.get(o, o) if isinstance(o, str) else o
+        self.triples.append({"主語": s, "述語": pred, "目的語": o_text,
+                             "文": template.replace("{s}", s).replace("{o}", str(o_text))})
+
+
+def evidence_payload(detail: pd.DataFrame, edges: pd.DataFrame, props: pd.DataFrame) -> dict:
+    """根拠を三つ組の一覧として渡す（値は SPARQL の結果のまま。比率のみ画面と同じ小数2桁表記）。
+
+    - judgements: 判定の一覧（結論の重い順。evidence.CONCLUSION_ORDER）。各判定の Evidence・ルール・結論の表示名
+    - triples: 根拠経路の実在トリプル（Evidence → 根拠ノード、根拠ノード同士）、Evidence の値、
+      根拠ノードの属性（ルール別に EXPLAIN_ATTRS で絞る）、ルールと前提ルールの属性。
+      分子・分母はルールの numerator_label / denominator_label を述語にする（「件」などへの読み替えをさせない）
     """
-    edges = edges.drop_duplicates().map(compact)
-    attrs: dict[str, dict] = {}
-    for r in props.itertuples():
-        attrs.setdefault(compact(r.node), {})[r.p.rsplit("#", 1)[-1]] = r.o
+    tb = _TripleBuilder(vocabulary())
     rules = rule_table()
+    for r in detail.drop_duplicates("node").itertuples():
+        tb.name_node(r.node, r.type, r.name)
+    for rule in rules.values():
+        tb.name_node(rule["iri"], "Rule", rule["name"])
+
     judgements = []
     for ev_iri in evidence.order_by_conclusion(detail):
-        group = detail[detail.evidence == ev_iri]
-        rows = [{k: compact(v) for k, v in r.items()} for r in group.to_dict("records")]
-        head = rows[0]
-        ev_iri = compact(ev_iri)
-        nodes = {r["node"] for r in rows}
-        measures = [
-            {"label": head[f"{part}Label"], "value": head[part]}
-            for part in ("numerator", "denominator")
-            if head[part] is not None
-        ]
-        judgements.append({
-            "evidence": ev_iri,
-            "conclusion": head["conclusion"],
-            "rule": {"id": head["ruleId"], "name": head["ruleName"], "threshold_unit": head["thresholdUnit"],
-                     "comparison": head["comparison"]},
-            # 判定の前提になったルール（R05 は R04 該当が前提）。値は rules グラフのまま
-            "preconditions": [rules[r] for r in evidence.RULE_PRECONDITIONS.get(head["ruleId"], [])],
-            # 画面と同じ表記（比率は小数2桁）。説明文と画面の数値を一致させる
-            "observedValue": viz.display_value(head["observedValue"], head["thresholdUnit"]),
-            "measures": measures,
-            "threshold": head["threshold"],
-            "undeterminedReason": head["undeterminedReason"],
-            "evaluatedAt": head["evaluatedAt"],
-            "nodes": [
-                {"iri": r["node"], "role": r["role"], "class": r["type"], "name": r["name"],
-                 "attributes": {k: v for k, v in attrs.get(r["node"], {}).items()
-                                if k in EXPLAIN_ATTRS.get(head["ruleId"], set())}}
-                for r in rows
-            ],
-            "path": [
-                {"s": e.s, "p": e.p, "o": e.o}
-                for e in edges.itertuples()
-                if e.s == ev_iri or (e.s in nodes and e.o in nodes)
-            ],
-        })
-    return {"judgements": judgements}
+        rows = detail[detail.evidence == ev_iri]
+        head = next(rows.itertuples())
+        ev = tb.name_node(ev_iri, "Evidence", None)
+        rule_label = tb.labels[rows[rows.role == "rule"].node.iloc[0]]
+        judgements.append({"判定": ev, "ルール": rule_label, "結論": head.conclusion})
+
+        # Evidence の値
+        tb.add(ev, "conclusion", head.conclusion)
+        tb.add(ev, "undeterminedReason", head.undeterminedReason)
+        if _clean(head.observedValue) is not None:
+            tb.add(ev, "observedValue", viz.display_value(head.observedValue, head.thresholdUnit))
+        tb.add(ev, "observedNumerator", head.numerator, label=_clean(head.numeratorLabel) or "分子")
+        tb.add(ev, "observedDenominator", head.denominator, label=_clean(head.denominatorLabel) or "分母")
+        tb.add(ev, "appliedThreshold", head.threshold)
+
+        # 根拠経路の実在トリプル（Evidence → 根拠ノード、根拠ノード同士）
+        nodes = set(rows.node)
+        for e in edges.drop_duplicates().itertuples():
+            if (e.s == ev_iri or e.s in nodes) and (e.o in nodes):
+                tb.add(tb.labels.get(e.s, e.s), viz.local(e.p), e.o)
+
+        # 根拠ノードの属性（判定経路の説明に使うものだけ）
+        allowed = EXPLAIN_ATTRS.get(head.ruleId, set())
+        for r in props[props.node.isin(nodes)].itertuples():
+            if viz.local(r.p) in allowed:
+                tb.add(tb.labels[r.node], viz.local(r.p), r.o)
+
+        # 適用ルールと前提ルール（R05 は R04）の属性
+        for rid in [head.ruleId, *evidence.RULE_PRECONDITIONS.get(head.ruleId, [])]:
+            rule = rules[rid]
+            for prop in ("rule_name", "description", "threshold", "comparison", "min_denominator"):
+                value = rule[prop]
+                if prop == "comparison" and _clean(value):
+                    value = f"{value}（{COMPARISON_JA.get(value, value)}）"
+                tb.add(tb.labels[rule["iri"]], prop, value)
+
+    return {"judgements": judgements, "triples": tb.triples}
 
 
 def rule_table() -> dict[str, dict]:
-    """rules グラフのルール（ID → id, name, threshold, comparison）。前提ルールの説明に使う。"""
+    """rules グラフのルール（ID → iri と各属性）。値は rules グラフのまま。"""
     df = fuseki.select(fuseki.load_query("app_rules.rq"))
-    return {r.ruleId: {"id": r.ruleId, "name": r.ruleName, "threshold": r.threshold, "comparison": r.comparison}
+    return {r.ruleId: {"iri": r.rule, "id": r.ruleId, "name": r.ruleName, "rule_name": r.ruleName,
+                       "description": r.description, "threshold": r.threshold, "comparison": r.comparison,
+                       "min_denominator": r.minDenominator}
             for r in df.itertuples()}
 
 
@@ -230,3 +282,34 @@ def nl_to_sparql(question: str, previous: str | None = None, error: str | None =
     if response.stop_reason == "max_tokens":
         raise RuntimeError(f"SPARQL が max_tokens={MAX_TOKENS_SPARQL} で途切れました")
     return _strip_fences(text)
+
+
+class ClaimCheck(BaseModel):
+    claim: str
+    triple_ids: list[int]
+    supported: bool
+    reason: str
+
+
+class RelationAudit(BaseModel):
+    claims: list[ClaimCheck]
+
+
+def relation_audit(text: str, payload: dict) -> list[ClaimCheck]:
+    """試行用の関係監査: 説明文の各主張が三つ組のどれに対応するかを Claude に判定させる。常時実行しない。
+
+    audit() は ID・名前・数値の「存在」しか見ないため、実在するノード同士を誤った関係で結ぶ文
+    （三つ組を辿った先を直接結ぶなど）は検出できない。それを補う確認として使う。
+    """
+    numbered = "\n".join(f"[{i}] {t['文']}" for i, t in enumerate(payload["triples"]))
+    prompt = load_prompt("relation_audit.md").replace("{{TRIPLES}}", numbered).replace("{{TEXT}}", text)
+    response = anthropic.Anthropic().messages.parse(
+        model=MODEL,
+        max_tokens=16000,
+        output_config={"effort": "high"},
+        messages=[{"role": "user", "content": prompt}],
+        output_format=RelationAudit,
+    )
+    if response.stop_reason == "refusal":
+        raise RuntimeError("関係監査が拒否されました（stop_reason=refusal）")
+    return response.parsed_output.claims

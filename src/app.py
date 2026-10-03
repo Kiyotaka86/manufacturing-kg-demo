@@ -391,7 +391,7 @@ def tab_graph() -> None:
         graphs = fuseki.select(fuseki.load_query("app_graph_counts.rq"))
         graphs["triples"] = graphs["triples"].astype(int)
         st.dataframe(graphs, width="stretch", hide_index=True)
-        st.caption(f"{len(graphs)} グラフ・{graphs.triples.sum():,} トリプル（名前付きグラフのみ。スキーマは既定グラフ）")
+        st.caption(f"{len(graphs)} グラフ・{graphs.triples.sum():,} トリプル（スキーマ urn:schema:kg を含む全名前付きグラフ）")
     with cols[1]:
         st.markdown("#### クラス別インスタンス数")
         classes = fuseki.select(fuseki.load_query("app_class_counts.rq"))

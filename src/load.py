@@ -1,7 +1,9 @@
 """kg_toolkit.xlsx → TriG 変換 → Fuseki 投入。
 
 1. scripts/xlsx_to_rdf.py で xlsx を TriG に変換し、SHACL 検証する（非準拠なら中断）
-2. ontology/schema.ttl を既定グラフへ GSP で投入
+2. ontology/schema.ttl を名前付きグラフ urn:schema:kg へ GSP で投入し、既定グラフは空にする
+   （tdb2:unionDefaultGraph によりクエリの既定グラフは名前付きグラフの和になるため、
+    スキーマも名前付きグラフに置かないとクエリから見えない。全グラフを一様に見せる構成に揃える）
 3. TriG 内の名前付きグラフ（urn:src:<sheet名> ×16）を1つずつ GSP で投入
 4. queries/materialize_*.rq を実行し、propertyChainAxiom を urn:derived:chains に実体化
    （Fuseki の Reasoner は使わない）
@@ -46,14 +48,24 @@ def convert_and_validate() -> None:
     )
 
 
-def put_default_graph() -> None:
+# "urn:schema" は Jena が不正な IRI として拒否する（URN は urn:<NID>:<NSS> の形が必要）ため urn:schema:kg とする
+SCHEMA_GRAPH = "urn:schema:kg"
+
+
+def put_schema_graph() -> None:
     resp = httpx.put(
-        f"{FUSEKI_URL}/data?default",
+        f"{FUSEKI_URL}/data",
+        params={"graph": SCHEMA_GRAPH},
         content=SCHEMA.read_bytes(),
         headers={"Content-Type": "text/turtle"},
     )
     resp.raise_for_status()
-    print(f"PUT default graph (schema.ttl): {resp.status_code}")
+    print(f"PUT graph <{SCHEMA_GRAPH}> (schema.ttl): {resp.status_code}")
+    # 以前の構成で既定グラフ（実体）に入れていたスキーマを消す。クエリからは見えないが残しておく理由がない
+    resp = httpx.delete(f"{FUSEKI_URL}/data?default")
+    if resp.status_code != 404:
+        resp.raise_for_status()
+    print(f"DELETE default graph: {resp.status_code}")
 
 
 def put_named_graphs() -> None:
@@ -112,7 +124,7 @@ def report() -> None:
 
 def main() -> None:
     convert_and_validate()
-    put_default_graph()
+    put_schema_graph()
     put_named_graphs()
     materialize_property_chains()
     evaluate_rules()

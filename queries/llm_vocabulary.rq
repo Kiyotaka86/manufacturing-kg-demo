@@ -1,0 +1,12 @@
+# 説明文生成（src/llm.py）用: クラス・プロパティの日本語ラベルと文型（ex:sentenceTemplate）
+# スキーマは名前付きグラフ urn:schema:kg にあり、既定グラフ（全名前付きグラフの和）から参照できる。
+PREFIX ex:   <http://example.org/kg/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?term (SAMPLE(?l) AS ?label) (SAMPLE(?t) AS ?template) WHERE {
+    { ?term rdfs:label ?l . FILTER(LANG(?l) = "ja") }
+    UNION
+    { ?term ex:sentenceTemplate ?t . }
+    FILTER(STRSTARTS(STR(?term), STR(ex:)))
+}
+GROUP BY ?term

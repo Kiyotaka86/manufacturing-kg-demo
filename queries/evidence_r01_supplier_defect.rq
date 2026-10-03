@@ -3,16 +3,20 @@
 # 計算と判定はこのクエリ内で完結し、結果を ex:Evidence として urn:src:evidence に書き戻す。
 # 閾値は data:rule/R01 の threshold、比較方向は comparison（gt なら「超える」）から読む。演算子をハードコードしない。
 #
+# 標本数: 消費ロット数（分母）が data:rule/R01 の min_denominator 未満のサプライヤーは不良率で判定しない。
+#   そのサプライヤーの部品を使ったロットには conclusion「判定不能」・undeterminedReason「標本数不足（…）」の
+#   Evidence を作る（該当なしとは区別する）。分子・分母・観測値は未束縛のため INSERT されない（R02 と同じ扱い）。
+#
 # what-if（タブ2）: ?thresholdOverride に値を入れると rules の閾値の代わりに使う（rules グラフは書き換えない）。
 #   UNDEF のときは rules の threshold を使う。src/evidence.py が VALUES 行と書き込み先グラフを差し替える。
 #
 # 実行前に必ず  CLEAR SILENT GRAPH <urn:src:evidence>  を流すこと（src/evidence.py がまとめて行う）。
 # USING は、データが名前付きグラフにあるため必須。省くと WHERE が既定グラフだけを見て 0 件になる。
 #
-# 閾値の較正について（要判断）:
-#   threshold=0.05 → 8 サプライヤー該当・80 ロット中 60 ロットが要注意（判定が効いていない）
-#   threshold=0.30 → 4 サプライヤー該当・27 ロット
-#   threshold=0.50 → S005 のみ該当・20 ロット
+# 閾値の較正について（要判断。最小標本数 5 の適用後）:
+#   threshold=0.05 → 5 サプライヤー該当・80 ロット中 53 ロットが要注意（判定が効いていない）
+#   threshold=0.30 → S005 のみ該当・20 ロット（0.50 でも同じ）
+#   いずれの閾値でも、消費ロット数 5 未満の 9 サプライヤーの 20 ロットは判定不能
 # rules シートの R01 は 0.05。デモでは 0.30 前後に上げるか、ルール文どおり「直近3ロット」に
 # window を絞るかのいずれかが必要。この較正作業自体が本番でも必ず発生する。
 PREFIX ex:   <http://example.org/kg/ontology#>
@@ -24,11 +28,12 @@ INSERT {
         ex:evidenceSubject ?lot ;
         ex:evidenceRule    ?rule ;
         ex:evidenceFact    ?lp , ?pu , ?sup ;
-        ex:observedValue   ?rate ;
-        ex:observedNumerator   ?defectLots ;
-        ex:observedDenominator ?totalLots ;
+        ex:observedValue   ?value ;
+        ex:observedNumerator   ?numerator ;
+        ex:observedDenominator ?denominator ;
         ex:appliedThreshold ?threshold ;
         ex:conclusion      ?conclusion ;
+        ex:undeterminedReason ?reason ;
         ex:evaluatedAt     ?now .
   }
 }
@@ -49,11 +54,20 @@ WHERE {
   }
   BIND(xsd:decimal(?defectLots) / xsd:decimal(?totalLots) AS ?rate)
 
-  # 2. 閾値と比較方向をルールから読み、条件を満たすサプライヤーだけ残す
-  ?rule ex:rule_id "R01" ; ex:threshold ?ruleThreshold ; ex:comparison ?cmp ; ex:conclusion ?conclusion .
+  # 2. 閾値・比較方向・最小標本数をルールから読み、条件を満たすサプライヤーと標本数不足のサプライヤーを残す
+  ?rule ex:rule_id "R01" ; ex:threshold ?ruleThreshold ; ex:comparison ?cmp ; ex:conclusion ?ruleConclusion .
+  OPTIONAL { ?rule ex:min_denominator ?minDen . }
   BIND(COALESCE(?thresholdOverride, ?ruleThreshold) AS ?threshold)
-  FILTER((?cmp = "gt" && ?rate >  ?threshold) || (?cmp = "ge" && ?rate >= ?threshold) ||
+  BIND(?totalLots < COALESCE(?minDen, 0) AS ?insufficient)
+  FILTER(?insufficient ||
+         (?cmp = "gt" && ?rate >  ?threshold) || (?cmp = "ge" && ?rate >= ?threshold) ||
          (?cmp = "lt" && ?rate <  ?threshold) || (?cmp = "le" && ?rate <= ?threshold))
+  BIND(IF(?insufficient, "判定不能", ?ruleConclusion) AS ?conclusion)
+  BIND(IF(?insufficient, CONCAT("標本数不足（当該サプライヤーの部品を消費したロット数 ", STR(?totalLots),
+                                 " が最小標本数 ", STR(?minDen), " 未満）"), ?unbound) AS ?reason)
+  BIND(IF(?insufficient, ?unbound, ?rate) AS ?value)
+  BIND(IF(?insufficient, ?unbound, ?defectLots) AS ?numerator)
+  BIND(IF(?insufficient, ?unbound, ?totalLots) AS ?denominator)
 
   # 3. 該当サプライヤーの部品を消費したロットを判定対象にする
   ?lp ex:consumedInLot ?lot ; ex:consumedPurchase ?pu .

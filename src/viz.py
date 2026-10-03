@@ -39,6 +39,7 @@ STYLE = {
                      "borderWidth": 2, "shapeProperties": {"borderDashes": [6, 4]}},
 }
 UNDETERMINED_EDGE = {"dashes": True, "color": "#9e9e9e"}
+SPECIFIC_FACT_PROPS = {"alternativePart", "alternativeSupplier"}  # ex:evidenceFact の下位プロパティ
 
 
 def local(iri: str) -> str:
@@ -172,7 +173,11 @@ def build(detail: pd.DataFrame, edges: pd.DataFrame, props: pd.DataFrame | None 
 
     drawn = set(net.get_nodes())
     undetermined = set(detail[detail.conclusion == evidence.UNDETERMINED].evidence)
+    # alternativePart などの下位プロパティがある組では、同じ組の evidenceFact は重ねて描かない
+    specific = {(e.s, e.o) for e in edges.itertuples() if local(e.p) in SPECIFIC_FACT_PROPS}
     for e in edges.itertuples():
+        if local(e.p) == "evidenceFact" and (e.s, e.o) in specific:
+            continue
         if e.s in drawn and e.o in drawn:
             extra = UNDETERMINED_EDGE if e.s in undetermined else {}
             net.add_edge(e.s, e.o, label=local(e.p), title=e.p, font={"size": 11}, **extra)

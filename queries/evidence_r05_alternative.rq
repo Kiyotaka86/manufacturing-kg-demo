@@ -1,5 +1,5 @@
 # R05: R04（評価が閾値未満）に該当するサプライヤーが供給する部品について、
-#      同一規格（spec）の部品を供給し、不良率が閾値以下のサプライヤーを代替候補と判定する。
+#      同一規格（spec）かつ同一部品種別（part_type）の部品を供給し、不良率が閾値以下のサプライヤーを代替候補と判定する。
 #
 # 根拠経路: 現行サプライヤー ← 部品（partSuppliedBy）→ 規格（hasSpec）← 代替部品 → 代替サプライヤー
 #   evidenceSubject = 対象部品（R04 該当サプライヤーが供給する部品）
@@ -8,8 +8,9 @@
 #                      alternativeSupplier でも記録し、現行サプライヤーと区別できるようにする。Reasoner は
 #                      使わないため evidenceFact も明示的に書く）
 #   分子・分母       = 代替サプライヤーの不良ロット数・総ロット数（R01 と同じ数え方）
-#   代替部品は同一規格の部品すべて（対象部品自身を含む。同じ部品を別サプライヤーから買う場合）。
-#   代替サプライヤーは現行サプライヤー以外。消費実績（ロット）が無いサプライヤーは不良率を計算できないため対象外。
+#   代替部品は同一規格かつ同一部品種別の部品すべて（対象部品自身を含む。同じ部品を別サプライヤーから買う場合）。
+#   代替サプライヤーは現行サプライヤー以外。消費ロット数（分母）が data:rule/R05 の min_denominator 未満の
+#   サプライヤーは不良率の標本が足りないため候補から除く（R01 と違い Evidence は作らない）。
 #   閾値・比較方向は data:rule/R04・R05 の threshold / comparison から読む。演算子をハードコードしない。
 #   partSuppliedBy は queries/materialize_part_supplier.rq が urn:derived:chains に実体化したショートカット。
 #
@@ -49,8 +50,9 @@ WHERE {
          (?r04Cmp = "lt" && ?rating <  ?r04Threshold) || (?r04Cmp = "le" && ?rating <= ?r04Threshold))
   ?part ex:partSuppliedBy ?curSupplier ; ex:hasSpec ?spec .
 
-  # 2. 同一規格の部品と、それを供給する現行以外のサプライヤー
-  ?altPart ex:hasSpec ?spec ; ex:partSuppliedBy ?altSupplier .
+  # 2. 同一規格・同一部品種別の部品と、それを供給する現行以外のサプライヤー
+  ?part ex:part_type ?partType .
+  ?altPart ex:hasSpec ?spec ; ex:part_type ?partType ; ex:partSuppliedBy ?altSupplier .
   FILTER(?altSupplier != ?curSupplier)
 
   # 3. 代替サプライヤーの不良率（不良ロット数 / 消費ロット数）
@@ -66,8 +68,10 @@ WHERE {
   }
   BIND(xsd:decimal(?defectLots) / xsd:decimal(?totalLots) AS ?rate)
 
-  # 4. R05: 不良率を閾値と比較（比較方向は R05 の comparison）
+  # 4. R05: 最小標本数を満たすサプライヤーだけ、不良率を閾値と比較（比較方向は R05 の comparison）
   ?rule ex:rule_id "R05" ; ex:threshold ?ruleThreshold ; ex:comparison ?cmp ; ex:conclusion ?conclusion .
+  OPTIONAL { ?rule ex:min_denominator ?minDen . }
+  FILTER(?totalLots >= COALESCE(?minDen, 0))
   BIND(COALESCE(?thresholdOverride, ?ruleThreshold) AS ?threshold)
   FILTER((?cmp = "gt" && ?rate >  ?threshold) || (?cmp = "ge" && ?rate >= ?threshold) ||
          (?cmp = "lt" && ?rate <  ?threshold) || (?cmp = "le" && ?rate <= ?threshold))

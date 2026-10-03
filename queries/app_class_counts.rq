@@ -1,11 +1,13 @@
 # アプリ用（タブ3）: クラスごとのインスタンス数（ex: 名前空間のクラスのみ）
-# スキーマ（rdfs:label など）は既定グラフに入っているが、tdb2:unionDefaultGraph により
-# クエリの既定グラフは名前付きグラフの和になるため、ここからは参照できない。
+# クラス名（rdfs:label）はスキーマのグラフ urn:schema:kg から。tdb2:unionDefaultGraph により
+# 既定グラフ（全名前付きグラフの和）でそのまま参照できる。
 PREFIX ex:   <http://example.org/kg/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 
-SELECT ?class (COUNT(DISTINCT ?s) AS ?instances) WHERE {
+SELECT ?class (SAMPLE(?l) AS ?label) (COUNT(DISTINCT ?s) AS ?instances) WHERE {
     ?s a ?class .
     FILTER(STRSTARTS(STR(?class), STR(ex:)))
+    OPTIONAL { ?class rdfs:label ?l . FILTER(LANG(?l) = "ja") }
 }
 GROUP BY ?class
 ORDER BY DESC(?instances) ?class

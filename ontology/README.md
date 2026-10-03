@@ -19,12 +19,29 @@ CLAUDE.md の「名前空間・URI設計は ontology/README.md に従う」の�
   purchases, lots, lot_operations, lot_parts, inspections, maintenance,
   orders_shipments, defects + rules シート）。`scripts/xlsx_to_rdf.py` の `MAP` が
   シート名→グラフ名の対応を保持する。
-- `urn:derived:chains` … `owl:propertyChainAxiom`（`ex:lotUsesSupplier`,
-  `ex:lotMadeOn`）を Fuseki の Reasoner を使わずに SPARQL INSERT で実体化した結果を
+- `urn:derived:chains` … `owl:propertyChainAxiom`（`ex:lotUsesSupplier`, `ex:lotMadeOn`,
+  `ex:partSuppliedBy`）を Fuseki の Reasoner を使わずに SPARQL INSERT で実体化した結果を
   格納するグラフ（`queries/materialize_*.rq`、`src/load.py` が投入時に実行）。
-- スキーマ（`ontology/schema.ttl`）自体は既定グラフに投入する。
-  `config/fuseki.ttl` で `tdb2:unionDefaultGraph true` としているため、
-  クエリ側は `GRAPH` 句なしで全グラフを横断参照できる。
+- `urn:schema:kg` … スキーマ（`ontology/schema.ttl`）。クラス・プロパティの `rdfs:label` と、
+  説明文生成用の文型 `ex:sentenceTemplate` を含む。
+  （`urn:schema` は Jena が不正な IRI として拒否するため `urn:schema:kg` とした。URN は `urn:<NID>:<NSS>` の形が必要）
+- `urn:src:evidence` … 判定結果（`ex:Evidence`）。`src/evidence.py` が R01〜R03・R05 の判定クエリ
+  （`queries/evidence_r*.rq`）を実行して CLEAR → 再生成する（`src/load.py` の最後でも実行）。
+- `urn:whatif:evidence` … アプリのタブ2（閾値の what-if）の判定結果。Evidence の IRI は
+  `data:evidence/whatif/` 配下に分ける。`src/load.py` が消すため、投入直後は存在しない。
+
+### 既定グラフの扱い
+
+`config/fuseki.ttl` で `tdb2:unionDefaultGraph true` としているため、クエリの既定グラフは
+**全名前付きグラフの和**になる。クエリ側は `GRAPH` 句なしで全グラフ（スキーマを含む）を一様に横断できる。
+
+- データもスキーマもすべて名前付きグラフに置き、実体の既定グラフは使わない（`src/load.py` が空にする）。
+  以前はスキーマを実体の既定グラフに入れていたが、unionDefaultGraph の下ではクエリから見えず
+  （`rdfs:label` が引けない）、全グラフが一様に見える構成に揃えた。
+- SELECT に `FROM` / `FROM NAMED` を付けない。`FROM` を付けると名前付きグラフが見えなくなり、
+  `GRAPH <urn:src:evidence> { ... }` が 0 件になる。
+- SPARQL UPDATE の WHERE は既定グラフの扱いが異なるため、判定クエリ・実体化クエリは
+  `USING <urn:x-arq:UnionGraph>` または `GRAPH` 句で読む元を明示する。
 
 ## URI パターン（インスタンス）
 
