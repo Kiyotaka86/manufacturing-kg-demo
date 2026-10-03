@@ -21,7 +21,7 @@ import evidence
 import fuseki
 import llm
 import viz
-from ui import cache, state, tab_graph, tab_whatif
+from ui import cache, nl_query, state, tab_graph, tab_whatif
 
 TABLE_ONLY_CQS = {"cq01", "cq02", "cq03", "cq04", "cq05"}
 # 判定系 CQ（Evidence を判定・経路・説明文で示す）と、Evidence の集計で順位を付ける CQ
@@ -176,7 +176,7 @@ def tab_ask(show_sparql: bool, explain_on: bool) -> None:
     if st.session_state.get(state.LAST_RUN) == (cq.id, target):
         render_selected(cq, target, graph, show_sparql, explain_on)
     st.divider()
-    nl_section()
+    nl_query.render()
 
 
 def render_selected(cq: fuseki.CQ, target: str | None, graph: str, show_sparql: bool, explain_on: bool) -> None:
@@ -220,59 +220,6 @@ def render_ranking(cq: fuseki.CQ, target: str, graph: str, show_sparql: bool) ->
             st.code(query, language="sparql")
     with st.expander(f"結果テーブル（全列・{len(df)} 件）"):
         st.dataframe(df.map(llm.compact), width="stretch", hide_index=True)
-
-
-def nl_section() -> None:
-    """自然文→SPARQL（APP_SPEC 第4節）。生成 SPARQL は必ず表示し、承認されてから実行する。
-
-    構文エラーまたは 0 件のときは、エラー内容を添えて1回だけ再生成する（再生成分も承認後に実行）。
-    2回失敗したらそこで止め、CQ からの選択を促す。
-    """
-    st.markdown("#### 自由入力（自然文 → SPARQL）")
-    if not llm.available():
-        st.caption("ANTHROPIC_API_KEY が未設定のため使えません。上の CQ から選んでください。")
-        return
-    question = st.text_input("質問", placeholder="例: 顧客ごとのクレーム件数を多い順に", key=state.NL_QUESTION)
-    nl_state = st.session_state.get(state.NL)
-    if nl_state and nl_state["q"] != question:
-        nl_state = st.session_state[state.NL] = None
-
-    if st.button("SPARQL を生成", disabled=not question):
-        try:
-            sparql = llm.nl_to_sparql(question)
-        except (anthropic.APIError, RuntimeError) as e:
-            st.error(f"生成に失敗しました: {e}")
-            return
-        nl_state = st.session_state[state.NL] = {"q": question, "sparql": sparql, "attempt": 1, "status": "pending",
-                                          "errors": [], "df": None}
-    if not nl_state:
-        return
-
-    if nl_state["errors"]:
-        st.warning(f"1回目のクエリは失敗しました（{nl_state['errors'][0]}）。再生成したクエリを確認してください。")
-    st.markdown(f"生成された SPARQL（{nl_state['attempt']} 回目）")
-    st.code(nl_state["sparql"], language="sparql")
-
-    if nl_state["status"] == "pending" and st.button("承認して実行", type="primary"):
-        df, err = fuseki.try_select(nl_state["sparql"])
-        if err is None:
-            nl_state.update(status="done", df=df)
-        elif nl_state["attempt"] == 1:
-            try:
-                sparql = llm.nl_to_sparql(question, previous=nl_state["sparql"], error=err)
-            except (anthropic.APIError, RuntimeError) as e:
-                nl_state.update(status="failed", errors=[err, f"再生成に失敗: {e}"])
-            else:
-                nl_state.update(sparql=sparql, attempt=2, errors=[err])
-        else:
-            nl_state.update(status="failed", errors=nl_state["errors"] + [err], df=df)
-        st.rerun()  # 実行後は承認ボタンを消す
-
-    if nl_state["status"] == "done":
-        st.markdown(f"**{len(nl_state['df'])} 件**")
-        st.dataframe(nl_state["df"].map(llm.compact), width="stretch", hide_index=True)
-    elif nl_state["status"] == "failed":
-        st.error(f"2回とも失敗しました（{nl_state['errors'][-1]}）。上の CQ から近い質問を選んでください。")
 
 
 def main() -> None:
