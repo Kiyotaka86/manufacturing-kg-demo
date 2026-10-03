@@ -89,7 +89,8 @@ ex:DefectShape a sh:NodeShape ; sh:targetClass ex:Defect ;
 ex:RuleShape a sh:NodeShape ; sh:targetClass ex:Rule ;
     sh:property [ sh:path ex:rule_id ; sh:minCount 1 ; sh:maxCount 1 ] ,
                 [ sh:path ex:description ; sh:minCount 1 ] ,
-                [ sh:path ex:conclusion ; sh:minCount 1 ] .
+                [ sh:path ex:conclusion ; sh:minCount 1 ] ,
+                [ sh:path ex:comparison ; sh:maxCount 1 ; sh:in ( "gt" "ge" "lt" "le" ) ] .
 
 # 説明層: 結論には必ずルールと1件以上の根拠が付き、根拠事実は評価時点より前の日付を持つ
 ex:EvidenceShape a sh:NodeShape ; sh:targetClass ex:Evidence ;
@@ -99,7 +100,13 @@ ex:EvidenceShape a sh:NodeShape ; sh:targetClass ex:Evidence ;
                 [ sh:path ex:conclusion ; sh:minCount 1 ] ,
                 [ sh:path ex:appliedThreshold ; sh:minCount 1 ; sh:maxCount 1 ] ,
                 [ sh:path ex:evaluatedAt ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ;
-    sh:sparql [ sh:message "根拠事実の日付が評価時点より後になっている（時系列矛盾）" ;
+    sh:sparql [ sh:message "判定不能の Evidence には undeterminedReason が必要" ;
+                sh:select """SELECT $this WHERE { $this ex:conclusion "判定不能" .
+                    FILTER NOT EXISTS { $this ex:undeterminedReason ?r } }""" ] ,
+              [ sh:message "判定不能以外の Evidence には observedNumerator が必要" ;
+                sh:select """SELECT $this WHERE { $this ex:conclusion ?c . FILTER(?c != "判定不能")
+                    FILTER NOT EXISTS { $this ex:observedNumerator ?n } }""" ] ,
+              [ sh:message "根拠事実の日付が評価時点より後になっている（時系列矛盾）" ;
                 sh:select """SELECT $this ?fact WHERE {
                     $this ex:evaluatedAt ?t ; ex:evidenceFact ?fact .
                     ?fact ?p ?d . FILTER(datatype(?d) = xsd:date || datatype(?d) = xsd:dateTime)

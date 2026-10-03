@@ -94,13 +94,18 @@ def list_cqs() -> list[CQ]:
     return cqs
 
 
-def bind_values(text: str, var: str, iri: str) -> str:
-    """`VALUES ?var { <...> }` の IRI を差し替える。該当行が無ければ ValueError。"""
-    pattern = re.compile(rf"(VALUES\s+\?{re.escape(var)}\s*\{{\s*)<[^>]+>(\s*\}})")
-    new, n = pattern.subn(rf"\g<1><{iri}>\g<2>", text, count=1)
+def set_values(text: str, var: str, term: str) -> str:
+    """`VALUES ?var { ... }` の中身を term（`<iri>`、`0.30`、`UNDEF` など）に差し替える。無ければ ValueError。"""
+    pattern = re.compile(rf"(VALUES\s+\?{re.escape(var)}\s*\{{)[^}}]*(\}})")
+    new, n = pattern.subn(lambda m: f"{m.group(1)} {term} {m.group(2)}", text, count=1)
     if n == 0:
         raise ValueError(f"VALUES ?{var} が見つかりません")
     return new
+
+
+def bind_values(text: str, var: str, iri: str) -> str:
+    """`VALUES ?var { <...> }` の IRI を差し替える。"""
+    return set_values(text, var, f"<{iri}>")
 
 
 def target_options(sample_iri: str) -> pd.DataFrame:

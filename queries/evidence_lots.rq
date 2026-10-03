@@ -1,0 +1,10 @@
+# アプリ用: Evidence が付いたロットと、そのルール・結論の一覧（タブ2 の変更前後比較に使う）
+PREFIX ex: <http://example.org/kg/ontology#>
+
+SELECT ?lot ?ruleId ?conclusion WHERE {
+    GRAPH <urn:src:evidence> {
+        ?ev ex:evidenceSubject ?lot ; ex:evidenceRule ?rule ; ex:conclusion ?conclusion .
+    }
+    ?rule ex:rule_id ?ruleId .
+}
+ORDER BY ?lot ?ruleId

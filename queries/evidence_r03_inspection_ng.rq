@@ -1,10 +1,11 @@
 # R03: 検査結果に NG が閾値（1件）以上あるロットを出荷保留と判定する。
 #
 # 根拠経路: ロット ← 検査結果（inspectedLot）→ 規格（inspectedSpec）
-#   分子 = NG となった検査の件数（分母なし）。閾値は data:rule/R03 の threshold。
+#   分子 = NG となった検査の件数（分母なし）。閾値は data:rule/R03 の threshold、比較方向は comparison。
 #   測定値（measured_value）と規格上下限（min_value / max_value）は根拠ノード（検査結果・規格）の
 #   属性としてグラフ上に既にあるため、Evidence には evidenceFact でノードへのリンクを張る。
 #
+# what-if（タブ2）: ?thresholdOverride に値を入れると rules の閾値の代わりに使う（UNDEF なら rules の値）。
 # 実行前に CLEAR SILENT GRAPH <urn:src:evidence> が必要（src/evidence.py がまとめて行う）。
 # USING は、データが名前付きグラフにあるため必須。
 PREFIX ex:   <http://example.org/kg/ontology#>
@@ -25,7 +26,10 @@ INSERT {
 }
 USING <urn:x-arq:UnionGraph>
 WHERE {
-  ?rule ex:rule_id "R03" ; ex:threshold ?threshold ; ex:conclusion ?conclusion .
+  VALUES ?thresholdOverride { UNDEF }  # what-if 用。アプリ層で差し替える
+
+  ?rule ex:rule_id "R03" ; ex:threshold ?ruleThreshold ; ex:comparison ?cmp ; ex:conclusion ?conclusion .
+  BIND(COALESCE(?thresholdOverride, ?ruleThreshold) AS ?threshold)
 
   # 1. ロットごとの NG 件数
   {
@@ -33,7 +37,8 @@ WHERE {
     WHERE { ?i ex:inspectedLot ?lot ; ex:result "NG" . }
     GROUP BY ?lot
   }
-  FILTER(?ngCount >= ?threshold)
+  FILTER((?cmp = "gt" && ?ngCount >  ?threshold) || (?cmp = "ge" && ?ngCount >= ?threshold) ||
+         (?cmp = "lt" && ?ngCount <  ?threshold) || (?cmp = "le" && ?ngCount <= ?threshold))
 
   # 2. NG となった検査とその規格を根拠にする
   ?insp ex:inspectedLot ?lot ; ex:result "NG" ; ex:inspectedSpec ?spec .

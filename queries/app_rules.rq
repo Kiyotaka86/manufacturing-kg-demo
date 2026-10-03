@@ -1,0 +1,12 @@
+# アプリ用: タブ2 のルール一覧（data:rule/*）。閾値・単位・比較方向・結論は rules シートの値そのまま
+PREFIX ex: <http://example.org/kg/ontology#>
+
+SELECT ?ruleId ?ruleName ?threshold ?thresholdUnit ?comparison ?conclusion ?description WHERE {
+    ?rule a ex:Rule ; ex:rule_id ?ruleId ; ex:rule_name ?ruleName .
+    OPTIONAL { ?rule ex:threshold ?threshold . }
+    OPTIONAL { ?rule ex:threshold_unit ?thresholdUnit . }
+    OPTIONAL { ?rule ex:comparison ?comparison . }
+    OPTIONAL { ?rule ex:conclusion ?conclusion . }
+    OPTIONAL { ?rule ex:description ?description . }
+}
+ORDER BY ?ruleId

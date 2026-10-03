@@ -1,9 +1,12 @@
 # R01: サプライヤー別の不良率が閾値を超える場合、そのサプライヤーの部品を使ったロットを要注意と判定する。
 #
 # 計算と判定はこのクエリ内で完結し、結果を ex:Evidence として urn:src:evidence に書き戻す。
-# 閾値は data:rule/R01 から読むため、rules シートの値を変えるだけで再判定できる（CQ10 の基盤）。
+# 閾値は data:rule/R01 の threshold、比較方向は comparison（gt なら「超える」）から読む。演算子をハードコードしない。
 #
-# 実行前に必ず  CLEAR SILENT GRAPH <urn:src:evidence>  を流すこと（load.py の chains と同じ理由）。
+# what-if（タブ2）: ?thresholdOverride に値を入れると rules の閾値の代わりに使う（rules グラフは書き換えない）。
+#   UNDEF のときは rules の threshold を使う。src/evidence.py が VALUES 行と書き込み先グラフを差し替える。
+#
+# 実行前に必ず  CLEAR SILENT GRAPH <urn:src:evidence>  を流すこと（src/evidence.py がまとめて行う）。
 # USING は、データが名前付きグラフにあるため必須。省くと WHERE が既定グラフだけを見て 0 件になる。
 #
 # 閾値の較正について（要判断）:
@@ -31,6 +34,8 @@ INSERT {
 }
 USING <urn:x-arq:UnionGraph>
 WHERE {
+  VALUES ?thresholdOverride { UNDEF }  # what-if 用。アプリ層で差し替える
+
   # 1. サプライヤー別に不良ロット数・総ロット数を集計し、不良率を出す（分子・分母も Evidence に残す）
   {
     SELECT ?sup (COUNT(DISTINCT ?defLot) AS ?defectLots) (COUNT(DISTINCT ?anyLot) AS ?totalLots)
@@ -44,9 +49,11 @@ WHERE {
   }
   BIND(xsd:decimal(?defectLots) / xsd:decimal(?totalLots) AS ?rate)
 
-  # 2. 閾値をルールから読み、超えたサプライヤーだけ残す
-  ?rule ex:rule_id "R01" ; ex:threshold ?threshold ; ex:conclusion ?conclusion .
-  FILTER(?rate > ?threshold)
+  # 2. 閾値と比較方向をルールから読み、条件を満たすサプライヤーだけ残す
+  ?rule ex:rule_id "R01" ; ex:threshold ?ruleThreshold ; ex:comparison ?cmp ; ex:conclusion ?conclusion .
+  BIND(COALESCE(?thresholdOverride, ?ruleThreshold) AS ?threshold)
+  FILTER((?cmp = "gt" && ?rate >  ?threshold) || (?cmp = "ge" && ?rate >= ?threshold) ||
+         (?cmp = "lt" && ?rate <  ?threshold) || (?cmp = "le" && ?rate <= ?threshold))
 
   # 3. 該当サプライヤーの部品を消費したロットを判定対象にする
   ?lp ex:consumedInLot ?lot ; ex:consumedPurchase ?pu .

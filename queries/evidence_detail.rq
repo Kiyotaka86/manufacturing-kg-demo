@@ -1,20 +1,21 @@
 # アプリ用: 1 ロットに対する Evidence と根拠ノードの一覧（role = subject / rule / fact）
 # 結論・観測値（分子/分母）・適用閾値・判定時刻は Evidence の値、分子/分母の意味と閾値の単位は Rule の値を
-# そのまま返す（再計算しない）
+# そのまま返す（再計算しない）。判定不能の Evidence は observedValue・分子・分母を持たず undeterminedReason を持つ
 PREFIX ex: <http://example.org/kg/ontology#>
 
 SELECT ?evidence ?ruleId ?ruleName ?role ?node ?type ?name
        ?observedValue ?numerator ?numeratorLabel ?denominator ?denominatorLabel
-       ?threshold ?thresholdUnit ?conclusion ?evaluatedAt
+       ?threshold ?thresholdUnit ?comparison ?conclusion ?undeterminedReason ?evaluatedAt
 WHERE {
     VALUES ?lot { <http://example.org/kg/data/lot/L0037> }  # アプリ層で差し替える
     GRAPH <urn:src:evidence> {
         ?evidence ex:evidenceSubject  ?lot ;
                   ex:evidenceRule     ?rule ;
-                  ex:observedValue    ?observedValue ;
                   ex:appliedThreshold ?threshold ;
                   ex:conclusion       ?conclusion ;
                   ex:evaluatedAt      ?evaluatedAt .
+        OPTIONAL { ?evidence ex:observedValue ?observedValue . }
+        OPTIONAL { ?evidence ex:undeterminedReason ?undeterminedReason . }
         OPTIONAL { ?evidence ex:observedNumerator ?numerator . }
         OPTIONAL { ?evidence ex:observedDenominator ?denominator . }
         { ?evidence ex:evidenceSubject ?node . BIND("subject" AS ?role) }
@@ -23,6 +24,7 @@ WHERE {
     }
     ?rule ex:rule_id ?ruleId ; ex:rule_name ?ruleName .
     OPTIONAL { ?rule ex:threshold_unit ?thresholdUnit . }
+    OPTIONAL { ?rule ex:comparison ?comparison . }
     OPTIONAL { ?rule ex:numerator_label ?numeratorLabel . }
     OPTIONAL { ?rule ex:denominator_label ?denominatorLabel . }
     OPTIONAL { ?node a ?type . FILTER(STRSTARTS(STR(?type), STR(ex:))) }

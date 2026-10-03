@@ -45,6 +45,9 @@ EXPLAIN_ATTRS = {
 HEDGES = ["思われ", "可能性", "推測", "考えられ", "おそらく", "かもしれ", "見られ", "恐れ", "推奨", "べき", "対策"]
 
 # 英数字に続かない ID（タイムスタンプ "2026-06-24T15:00" の "T15" を ID と誤認しない）
+# 判定不能を「該当なし」と読み替える表現。payload に入るのは該当か判定不能だけなので、常に誤り
+NOT_APPLICABLE = ["該当なし", "該当しない", "該当せず", "非該当", "問題なし", "問題ない"]
+
 ID_TOKEN = re.compile(r"(?<![0-9A-Za-z])[A-Z]{1,3}\d{2,}")
 NUM_TOKEN = re.compile(r"\d+(?:\.\d+)?")
 
@@ -100,6 +103,7 @@ def evidence_payload(detail: pd.DataFrame, edges: pd.DataFrame, props: pd.DataFr
             "observedValue": viz.display_value(head["observedValue"], head["thresholdUnit"]),
             "measures": measures,
             "threshold": head["threshold"],
+            "undeterminedReason": head["undeterminedReason"],
             "evaluatedAt": head["evaluatedAt"],
             "nodes": [
                 {"iri": r["node"], "role": r["role"], "class": r["type"], "name": r["name"],
@@ -167,4 +171,5 @@ def audit(text: str, payload: dict, known_names: list[str] = ()) -> list[str]:
     issues += [f"根拠にない数値: {n}" for n in sorted(_numbers(stripped) - allowed)]
 
     issues += [f"推測・提案表現: 「{h}」" for h in HEDGES if h in text]
+    issues += [f"該当なしへの読み替え: 「{w}」" for w in NOT_APPLICABLE if w in text]
     return issues

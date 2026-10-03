@@ -1,10 +1,10 @@
-# アプリ用: urn:src:evidence の Evidence 件数（ルール別）と判定時刻
+# アプリ用: urn:src:evidence の Evidence 件数（ルール別・結論別）と判定時刻
 PREFIX ex: <http://example.org/kg/ontology#>
 
-SELECT ?rule (COUNT(DISTINCT ?ev) AS ?evidences) (MAX(?at) AS ?evaluatedAt) WHERE {
+SELECT ?rule ?conclusion (COUNT(DISTINCT ?ev) AS ?evidences) (MAX(?at) AS ?evaluatedAt) WHERE {
     GRAPH <urn:src:evidence> {
-        ?ev a ex:Evidence ; ex:evidenceRule ?rule ; ex:evaluatedAt ?at .
+        ?ev a ex:Evidence ; ex:evidenceRule ?rule ; ex:conclusion ?conclusion ; ex:evaluatedAt ?at .
     }
 }
-GROUP BY ?rule
-ORDER BY ?rule
+GROUP BY ?rule ?conclusion
+ORDER BY ?rule ?conclusion

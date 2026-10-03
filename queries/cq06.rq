@@ -1,45 +1,34 @@
 # CQ06: ロットLは「要注意」か。判定理由を経路で示せ (R01, R02, R03)
-# path: lot -> lot_parts -> purchase -> supplier -> 不良率 -> R01（R02/R03も合わせて判定）
+# path: lot <- Evidence（urn:src:evidence）-> rule / 根拠事実
 #
-# UNION の各枝が該当する場合、その根拠（?evidence）と適用ルール（?ruleApplied）を1行ずつ返す。
-# 該当行が1件でもあれば当該ロットは要注意。複数該当時の優先順位付けはアプリ層で行う。
-# 簡略化: R02 の日数比較（保全実施日から保全間隔を超えているか）は xsd:date の減算に
-# エンジン依存の挙動があるため、厳密な日数判定はアプリ層（Python）で確認する前提とし、
-# ここでは「直近の保全実施日」と「設備の保全間隔」を根拠として提示するところまでとする。
+# 判定は queries/evidence_r0*.rq が urn:src:evidence に書き戻した ex:Evidence をそのまま読む。
+# アプリの判定・根拠経路・説明文も同じ Evidence を元にするため、結果テーブルと画面の判定は常に一致する。
+# 1 行 = 1 Evidence（該当ルール）。行が無ければどのルールにも該当しない。
+# 判定不能（R02 で保全記録が無いなど）は conclusion「判定不能」と undeterminedReason で返す。
+# 結論の重い順（出荷保留 > 要注意 > 判定不能）の並べ替えはアプリ層で行う。
 PREFIX ex:   <http://example.org/kg/ontology#>
 PREFIX data: <http://example.org/kg/data/>
 
-SELECT ?lot ?ruleApplied ?evidence WHERE {
+SELECT ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator
+       ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence
+       (GROUP_CONCAT(DISTINCT STR(?fact); separator=" ") AS ?facts)
+WHERE {
     VALUES ?lot { <http://example.org/kg/data/lot/L0003> }  # 対象ロットはアプリ層で差し替える
-    {
-        # R03: 検査結果にNGが1件以上ある
-        ?inspection ex:inspectedLot ?lot ; ex:result "NG" .
-        BIND(<http://example.org/kg/data/rule/R03> AS ?ruleApplied)
-        BIND(?inspection AS ?evidence)
-    } UNION {
-        # R02: 保全間隔を超えた設備で製造（直近保全日・保全間隔を根拠として提示）
-        ?lot ex:lotMadeOn ?equipment .
-        ?equipment ex:maint_interval_days ?interval .
-        ?maint ex:maintainedEquipment ?equipment ; ex:maint_date ?maintDate .
-        FILTER NOT EXISTS {
-            ?laterMaint ex:maintainedEquipment ?equipment ; ex:maint_date ?laterDate .
-            FILTER(?laterDate > ?maintDate)
-        }
-        BIND(<http://example.org/kg/data/rule/R02> AS ?ruleApplied)
-        BIND(?maint AS ?evidence)
-    } UNION {
-        # R01: 供給元サプライヤーの不良率が閾値以上
-        ?lot ex:lotUsesSupplier ?supplier .
-        <http://example.org/kg/data/rule/R01> ex:threshold ?threshold .
-        {
-            SELECT ?supplier (COUNT(DISTINCT ?l) AS ?lotCount) (COUNT(DISTINCT ?d) AS ?defectCount) WHERE {
-                ?c ex:consumedPurchase ?p ; ex:consumedInLot ?l .
-                ?p ex:purchasedFrom ?supplier .
-                OPTIONAL { ?d ex:defectLot ?l }
-            } GROUP BY ?supplier
-        }
-        FILTER(?defectCount / ?lotCount >= ?threshold)
-        BIND(<http://example.org/kg/data/rule/R01> AS ?ruleApplied)
-        BIND(?supplier AS ?evidence)
+    GRAPH <urn:src:evidence> {
+        ?evidence ex:evidenceSubject ?lot ;
+                  ex:evidenceRule ?rule ;
+                  ex:conclusion ?conclusion ;
+                  ex:appliedThreshold ?threshold ;
+                  ex:evidenceFact ?fact .
+        OPTIONAL { ?evidence ex:observedValue ?observedValue . }
+        OPTIONAL { ?evidence ex:observedNumerator ?numerator . }
+        OPTIONAL { ?evidence ex:observedDenominator ?denominator . }
+        OPTIONAL { ?evidence ex:undeterminedReason ?undeterminedReason . }
     }
+    ?rule ex:rule_id ?ruleId ; ex:rule_name ?ruleName .
+    OPTIONAL { ?rule ex:comparison ?comparison . }
+    OPTIONAL { ?rule ex:threshold_unit ?thresholdUnit . }
 }
+GROUP BY ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator
+         ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence
+ORDER BY ?ruleId

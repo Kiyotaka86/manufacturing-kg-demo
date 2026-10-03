@@ -4,10 +4,14 @@
 #   「最終保全」はロット製造開始日（start_date）以前で最も新しい保全。全期間の最新保全ではない
 #   （判定時点で知り得なかった保全を根拠にしないため）。
 #   分子 = 最終保全日からロット製造開始日までの日数、分母 = 設備の保全間隔。
-#   閾値は Rule ではなく設備ごとの maint_interval_days（rules シートの R02 は threshold が空欄）。
+#   閾値 = 設備の保全間隔 × ?intervalFactor（既定 1.0）。比較方向は data:rule/R02 の comparison。
+#   rules シートの R02 は threshold が空欄（設備ごとに決まるため）。
 #
-# 製造開始日以前に保全記録が1件もない設備で作ったロットは日数を計算できないため判定しない（Evidence なし）。
+# 判定不能: 製造開始日以前に保全記録が1件もない設備で作ったロットは日数を計算できない。
+#   該当なしとは区別し、conclusion「判定不能」・undeterminedReason 付きの Evidence を作る。
+#   根拠は工程実績と設備まで。最終保全・分子・分母・観測値は未束縛のため INSERT されない。
 #
+# what-if（タブ2）: ?intervalFactor を差し替えると閾値が「保全間隔 × 倍率」になる。
 # 実行前に CLEAR SILENT GRAPH <urn:src:evidence> が必要（src/evidence.py がまとめて行う）。
 # USING は、データが名前付きグラフにあるため必須。
 PREFIX ex:   <http://example.org/kg/ontology#>
@@ -22,33 +26,48 @@ INSERT {
         ex:evidenceFact    ?op , ?eq , ?maint ;
         ex:observedValue   ?days ;
         ex:observedNumerator   ?days ;
-        ex:observedDenominator ?interval ;
-        ex:appliedThreshold ?interval ;
+        ex:observedDenominator ?denominator ;
+        ex:appliedThreshold ?threshold ;
         ex:conclusion      ?conclusion ;
+        ex:undeterminedReason ?reason ;
         ex:evaluatedAt     ?now .
   }
 }
 USING <urn:x-arq:UnionGraph>
 WHERE {
-  ?rule ex:rule_id "R02" ; ex:conclusion ?conclusion .
+  VALUES ?intervalFactor { 1.0 }  # what-if 用。アプリ層で差し替える
 
-  # 1. ロットごとに、製造開始日以前で最も新しい保全日を求める
+  ?rule ex:rule_id "R02" ; ex:comparison ?cmp ; ex:conclusion ?ruleConclusion .
+
+  # 1. ロットごとに、製造開始日以前で最も新しい保全日を求める（無ければ ?lastDate は未束縛）
   {
     SELECT ?lot ?op ?eq ?start (MAX(?md) AS ?lastDate)
     WHERE {
       ?op ex:opLot ?lot ; ex:opEquipment ?eq .
       ?lot ex:start_date ?start .
-      ?m ex:maintainedEquipment ?eq ; ex:maint_date ?md .
-      FILTER(?md <= ?start)
+      OPTIONAL {
+        ?m ex:maintainedEquipment ?eq ; ex:maint_date ?md .
+        FILTER(?md <= ?start)
+      }
     }
     GROUP BY ?lot ?op ?eq ?start
   }
-  ?maint ex:maintainedEquipment ?eq ; ex:maint_date ?lastDate .
+  # ?lastDate が未束縛のとき任意の保全に一致しないよう、別変数で受けて条件で絞る
+  OPTIONAL {
+    ?maint ex:maintainedEquipment ?eq ; ex:maint_date ?maintDate .
+    FILTER(BOUND(?lastDate) && ?maintDate = ?lastDate)
+  }
 
-  # 2. 経過日数と設備の保全間隔を比較する
+  # 2. 経過日数と「保全間隔 × 倍率」を比較する。保全記録が無いロットは判定不能として残す
   ?eq ex:maint_interval_days ?interval .
+  BIND(?interval * ?intervalFactor AS ?threshold)
   BIND(fn:days-from-duration(?start - ?lastDate) AS ?days)
-  FILTER(?days > ?interval)
+  FILTER(!BOUND(?lastDate) ||
+         (?cmp = "gt" && ?days >  ?threshold) || (?cmp = "ge" && ?days >= ?threshold) ||
+         (?cmp = "lt" && ?days <  ?threshold) || (?cmp = "le" && ?days <= ?threshold))
+  BIND(IF(BOUND(?lastDate), ?ruleConclusion, "判定不能") AS ?conclusion)
+  BIND(IF(BOUND(?lastDate), ?unbound, "ロット開始日以前の保全記録なし") AS ?reason)
+  BIND(IF(BOUND(?lastDate), ?interval, ?unbound) AS ?denominator)  # 判定不能では分母も空にする
 
   BIND(NOW() AS ?now)
   BIND(IRI(CONCAT("http://example.org/kg/data/evidence/R02-",

@@ -5,7 +5,8 @@
 3. TriG 内の名前付きグラフ（urn:src:<sheet名> ×16）を1つずつ GSP で投入
 4. queries/materialize_*.rq を実行し、propertyChainAxiom を urn:derived:chains に実体化
    （Fuseki の Reasoner は使わない）
-5. src/evidence.py で判定ルールを実行し、urn:src:evidence を CLEAR → 再生成する
+5. src/evidence.py で判定ルールを実行し、urn:src:evidence を CLEAR → 再生成する。
+   タブ2 の what-if 結果（urn:whatif:evidence）は前回の残りなので消す
 """
 
 import os
@@ -91,9 +92,10 @@ def materialize_property_chains() -> None:
 
 
 def evaluate_rules() -> None:
+    evidence.clear(evidence.WHATIF_GRAPH)
     df = evidence.evaluate()
     for row in df.itertuples():
-        print(f"evidence {row.rule.rsplit('/', 1)[-1]}: {row.evidences}")
+        print(f"evidence {row.rule.rsplit('/', 1)[-1]} {row.conclusion}: {row.evidences}")
 
 
 def report() -> None:

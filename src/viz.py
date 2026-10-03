@@ -33,7 +33,11 @@ STYLE = {
     "fact": {"color": "#8fd3f4", "shape": "dot", "size": 18},
     "rule": {"color": "#f28c28", "shape": "box", "font": {"color": "#ffffff"}},
     "evidence": {"color": "#7b3fa0", "shape": "diamond", "size": 24},
+    # 判定不能: 灰色・破線。結論が出ていないことを該当（紫）と見分けられるようにする
+    "undetermined": {"color": {"background": "#d9d9d9", "border": "#7f7f7f"}, "shape": "diamond", "size": 24,
+                     "borderWidth": 2, "shapeProperties": {"borderDashes": [6, 4]}},
 }
+UNDETERMINED_EDGE = {"dashes": True, "color": "#9e9e9e"}
 
 
 def local(iri: str) -> str:
@@ -57,7 +61,10 @@ def observed_text(row) -> str:
     """測定値と閾値の表示。単位は Rule の threshold_unit に従う。
 
     ratio → 「16 / 20 = 0.80（閾値 0.05）」、days → 「75 日（閾値 60 日）」、count → 「1 件（閾値 1 件）」
+    判定不能 → 「判定不能（ロット開始日以前の保全記録なし）」
     """
+    if row.conclusion == evidence.UNDETERMINED:
+        return f"判定不能（{row.undeterminedReason}）"
     unit = row.thresholdUnit if pd.notna(row.thresholdUnit) else ""
     if unit.startswith("ratio"):
         value = display_value(row.observedValue, unit)
@@ -148,23 +155,26 @@ def build(detail: pd.DataFrame, edges: pd.DataFrame, props: pd.DataFrame | None 
             for j, f in enumerate(group):
                 if f.node in net.get_nodes():
                     continue
-                spread = (j - (len(group) - 1) / 2) * 0.35
+                spread = (j - (len(group) - 1) / 2) * 0.55
                 net.add_node(f.node, label=node_label(f), title=node_title(f.node, props),
                              **STYLE["fact"], **polar(HOP_RADIUS * hop, theta + spread))
 
         # 結論（Evidence）と適用ルールは経路の脇に置く
         title = "\n".join(x for x in (ev_iri, f"{ev.ruleName}: {observed_text(ev)}", measures_text(ev),
                                       f"評価時刻 {ev.evaluatedAt}") if x)
+        style = STYLE["undetermined" if ev.conclusion == evidence.UNDETERMINED else "evidence"]
         net.add_node(ev_iri, label=f"{ev.conclusion}\n{ev.ruleId}", title=title,
-                     **STYLE["evidence"], **polar(HOP_RADIUS * 1.5, theta + SIDE_ANGLE))
+                     **style, **polar(HOP_RADIUS * 1.5, theta + SIDE_ANGLE))
         rule = next(rows[rows.role == "rule"].itertuples())
         net.add_node(rule.node, label=node_label(rule), title=rule.node,
                      **STYLE["rule"], **polar(HOP_RADIUS * 2.5, theta + SIDE_ANGLE * 0.75))
 
     drawn = set(net.get_nodes())
+    undetermined = set(detail[detail.conclusion == evidence.UNDETERMINED].evidence)
     for e in edges.itertuples():
         if e.s in drawn and e.o in drawn:
-            net.add_edge(e.s, e.o, label=local(e.p), title=e.p, font={"size": 11})
+            extra = UNDETERMINED_EDGE if e.s in undetermined else {}
+            net.add_edge(e.s, e.o, label=local(e.p), title=e.p, font={"size": 11}, **extra)
     return net
 
 
