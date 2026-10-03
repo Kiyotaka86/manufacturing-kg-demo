@@ -21,6 +21,7 @@ import evidence
 import fuseki
 import llm
 import viz
+from ui import cache, state
 
 TABLE_ONLY_CQS = {"cq01", "cq02", "cq03", "cq04", "cq05"}
 # 判定系 CQ（Evidence を判定・経路・説明文で示す）と、Evidence の集計で順位を付ける CQ
@@ -32,42 +33,11 @@ EMPTY_JUDGEMENT = {
     "cq08": ("代替候補なし", "この部品の現行サプライヤーが R04 に該当しないか、R05 を満たす代替がありません。"),
 }
 
-TAB_ASK, TAB_WHATIF, TAB_GRAPH = "質問する", "閾値を変える", "グラフを見る"
-
-
-@st.cache_data(ttl=30, show_spinner=False)
-def cached_status() -> fuseki.Status:
-    return fuseki.status()
-
-
-@st.cache_data(show_spinner=False)
-def cached_targets(sample_iri: str) -> list[tuple[str, str]]:
-    df = fuseki.target_options(sample_iri)
-    return [(row.s, f"{row.s.rsplit('/', 1)[-1]} {row.name or ''}".strip()) for row in df.itertuples()]
-
-
-@st.cache_data(show_spinner=False)
-def cached_names() -> list[str]:
-    return fuseki.select(fuseki.load_query("app_names.rq"))["name"].tolist()
-
-
-@st.cache_data(show_spinner="説明文を生成中…")
-def cached_explanation(payload_json: str) -> str:
-    return llm.explain(json.loads(payload_json))
-
-
-def graph_label(graph: str) -> str:
-    if graph == evidence.EVIDENCE_GRAPH:
-        return "確定（rules の閾値）"
-    applied = st.session_state.get("whatif")
-    return f"what-if（{applied}）" if applied else "what-if（前回の設定）"
-
-
 def sidebar() -> tuple[fuseki.Status, bool, bool]:
     with st.sidebar:
         st.subheader("Fuseki 接続状態")
         st.caption(fuseki.FUSEKI_URL)
-        status = cached_status()
+        status = cache.cached_status()
         if status.ok:
             st.markdown(":green[●] 接続中")
             st.markdown(f"{status.graphs} graphs  \n{status.triples:,} triples")
@@ -162,18 +132,18 @@ def render_judgement(cq: fuseki.CQ, target: str, graph: str, show_sparql: bool, 
             st.markdown("#### 説明")
             payload = llm.evidence_payload(detail, edges, props)
             try:
-                text = cached_explanation(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+                text = cache.cached_explanation(json.dumps(payload, ensure_ascii=False, sort_keys=True))
             except (anthropic.APIError, RuntimeError) as e:  # 説明文が無くても判定と経路は成立させる
                 st.warning(f"説明文を生成できませんでした: {e}")
             else:
                 st.write(text)
-                issues = llm.audit(text, payload, cached_names())
+                issues = llm.audit(text, payload, cache.cached_names())
                 for issue in issues:
                     st.warning(f"自己点検: {issue}")
                 if not issues:
                     st.caption("自己点検: 根拠外の ID・名前・数値、推測・提案表現、該当なしへの読み替えは検出されませんでした。")
 
-    st.caption(f"参照した判定: {graph_label(graph)}（{graph}）")
+    st.caption(f"参照した判定: {state.graph_label(graph)}（{graph}）")
     if show_sparql:
         with st.expander("実行した SPARQL"):
             st.code(query, language="sparql")
@@ -183,14 +153,14 @@ def render_judgement(cq: fuseki.CQ, target: str, graph: str, show_sparql: bool, 
 
 def tab_ask(show_sparql: bool, explain_on: bool) -> None:
     cqs = {cq.id: cq for cq in fuseki.list_cqs() if cq.id in TABLE_ONLY_CQS | EVIDENCE_CQS}
-    cq = cqs[st.selectbox("CQ を選ぶ", list(cqs), format_func=lambda i: cqs[i].title, key="cq_select")]
+    cq = cqs[st.selectbox("CQ を選ぶ", list(cqs), format_func=lambda i: cqs[i].title, key=state.CQ_SELECT)]
 
     target = None
     if cq.target_var:
-        options = cached_targets(cq.default_target)
+        options = cache.cached_targets(cq.default_target)
         labels = dict(options)
         iris = [iri for iri, _ in options]
-        key = f"target_{cq.id}"
+        key = state.target_key(cq.id)
         if key not in st.session_state:
             st.session_state[key] = cq.default_target if cq.default_target in iris else iris[0]
         target = st.selectbox(f"対象を選ぶ（?{cq.target_var}）", iris, format_func=labels.get, key=key)
@@ -198,12 +168,12 @@ def tab_ask(show_sparql: bool, explain_on: bool) -> None:
     graph = evidence.EVIDENCE_GRAPH
     if cq.id in EVIDENCE_CQS and not evidence.counts(evidence.WHATIF_GRAPH).empty:
         graphs = [evidence.EVIDENCE_GRAPH, evidence.WHATIF_GRAPH]
-        graph = st.radio("参照する判定", graphs, format_func=graph_label, horizontal=True, key="evidence_graph")
+        graph = st.radio("参照する判定", graphs, format_func=state.graph_label, horizontal=True, key=state.EVIDENCE_GRAPH_CHOICE)
 
     # 実行結果は選択が変わるまで保持する（チェックボックス操作などの再描画で消さない）
     if st.button("実行", type="primary"):
-        st.session_state["last_run"] = (cq.id, target)
-    if st.session_state.get("last_run") == (cq.id, target):
+        st.session_state[state.LAST_RUN] = (cq.id, target)
+    if st.session_state.get(state.LAST_RUN) == (cq.id, target):
         render_selected(cq, target, graph, show_sparql, explain_on)
     st.divider()
     nl_section()
@@ -241,10 +211,10 @@ def render_ranking(cq: fuseki.CQ, target: str, graph: str, show_sparql: bool) ->
                 st.caption("ロットを押すと CQ06 でそのロットの根拠経路を開きます。")
                 for col, lot in zip(st.columns(min(len(lots), 6)), lots):
                     col.button(viz.local(lot), key=f"cq07_{viz.local(row.cause)}_{viz.local(lot)}",
-                               on_click=open_in_cq06, args=(lot, graph), width="stretch")
+                               on_click=state.open_in_cq06, args=(lot, graph), width="stretch")
     st.caption("既存の Evidence（R01: サプライヤー、R02: 設備）の集計のみで、新たな判定は行っていません。"
                "判定不能は除外。R07（設備起因疑い）は判定クエリが未実装のため含みません。"
-               f"参照した判定: {graph_label(graph)}")
+               f"参照した判定: {state.graph_label(graph)}")
     if show_sparql:
         with st.expander("実行した SPARQL"):
             st.code(query, language="sparql")
@@ -262,10 +232,10 @@ def nl_section() -> None:
     if not llm.available():
         st.caption("ANTHROPIC_API_KEY が未設定のため使えません。上の CQ から選んでください。")
         return
-    question = st.text_input("質問", placeholder="例: 顧客ごとのクレーム件数を多い順に", key="nl_question")
-    state = st.session_state.get("nl")
-    if state and state["q"] != question:
-        state = st.session_state["nl"] = None
+    question = st.text_input("質問", placeholder="例: 顧客ごとのクレーム件数を多い順に", key=state.NL_QUESTION)
+    nl_state = st.session_state.get(state.NL)
+    if nl_state and nl_state["q"] != question:
+        nl_state = st.session_state[state.NL] = None
 
     if st.button("SPARQL を生成", disabled=not question):
         try:
@@ -273,45 +243,36 @@ def nl_section() -> None:
         except (anthropic.APIError, RuntimeError) as e:
             st.error(f"生成に失敗しました: {e}")
             return
-        state = st.session_state["nl"] = {"q": question, "sparql": sparql, "attempt": 1, "status": "pending",
+        nl_state = st.session_state[state.NL] = {"q": question, "sparql": sparql, "attempt": 1, "status": "pending",
                                           "errors": [], "df": None}
-    if not state:
+    if not nl_state:
         return
 
-    if state["errors"]:
-        st.warning(f"1回目のクエリは失敗しました（{state['errors'][0]}）。再生成したクエリを確認してください。")
-    st.markdown(f"生成された SPARQL（{state['attempt']} 回目）")
-    st.code(state["sparql"], language="sparql")
+    if nl_state["errors"]:
+        st.warning(f"1回目のクエリは失敗しました（{nl_state['errors'][0]}）。再生成したクエリを確認してください。")
+    st.markdown(f"生成された SPARQL（{nl_state['attempt']} 回目）")
+    st.code(nl_state["sparql"], language="sparql")
 
-    if state["status"] == "pending" and st.button("承認して実行", type="primary"):
-        df, err = fuseki.try_select(state["sparql"])
+    if nl_state["status"] == "pending" and st.button("承認して実行", type="primary"):
+        df, err = fuseki.try_select(nl_state["sparql"])
         if err is None:
-            state.update(status="done", df=df)
-        elif state["attempt"] == 1:
+            nl_state.update(status="done", df=df)
+        elif nl_state["attempt"] == 1:
             try:
-                sparql = llm.nl_to_sparql(question, previous=state["sparql"], error=err)
+                sparql = llm.nl_to_sparql(question, previous=nl_state["sparql"], error=err)
             except (anthropic.APIError, RuntimeError) as e:
-                state.update(status="failed", errors=[err, f"再生成に失敗: {e}"])
+                nl_state.update(status="failed", errors=[err, f"再生成に失敗: {e}"])
             else:
-                state.update(sparql=sparql, attempt=2, errors=[err])
+                nl_state.update(sparql=sparql, attempt=2, errors=[err])
         else:
-            state.update(status="failed", errors=state["errors"] + [err], df=df)
+            nl_state.update(status="failed", errors=nl_state["errors"] + [err], df=df)
         st.rerun()  # 実行後は承認ボタンを消す
 
-    if state["status"] == "done":
-        st.markdown(f"**{len(state['df'])} 件**")
-        st.dataframe(state["df"].map(llm.compact), width="stretch", hide_index=True)
-    elif state["status"] == "failed":
-        st.error(f"2回とも失敗しました（{state['errors'][-1]}）。上の CQ から近い質問を選んでください。")
-
-
-def open_in_cq06(lot: str, graph: str) -> None:
-    """タブ2 のロットボタン: タブ1 の CQ06 に切り替え、そのロットと参照グラフを選んで実行済みにする。"""
-    st.session_state["cq_select"] = "cq06"
-    st.session_state["target_cq06"] = lot
-    st.session_state["evidence_graph"] = graph
-    st.session_state["last_run"] = ("cq06", lot)
-    st.session_state["main_tabs"] = TAB_ASK
+    if nl_state["status"] == "done":
+        st.markdown(f"**{len(nl_state['df'])} 件**")
+        st.dataframe(nl_state["df"].map(llm.compact), width="stretch", hide_index=True)
+    elif nl_state["status"] == "failed":
+        st.error(f"2回とも失敗しました（{nl_state['errors'][-1]}）。上の CQ から近い質問を選んでください。")
 
 
 def lot_sets(df: pd.DataFrame, include_undetermined: bool) -> dict[str, list[str]]:
@@ -339,7 +300,7 @@ def tab_whatif() -> None:
     if st.button("再判定", type="primary"):
         overrides = {"R01": f"{r01:.2f}", "R02": f"{r02:.1f}", "R03": str(int(r03))}
         evidence.evaluate(graph=evidence.WHATIF_GRAPH, overrides=overrides)
-        st.session_state["whatif"] = f"R01={overrides['R01']}, R02 倍率={overrides['R02']}, R03={overrides['R03']}"
+        st.session_state[state.WHATIF] = f"R01={overrides['R01']}, R02 倍率={overrides['R02']}, R03={overrides['R03']}"
         st.cache_data.clear()
 
     after_df = evidence.judged_lots(evidence.WHATIF_GRAPH)
@@ -349,7 +310,7 @@ def tab_whatif() -> None:
     before_df = evidence.judged_lots(evidence.EVIDENCE_GRAPH)
 
     st.divider()
-    st.markdown(f"**変更前**: {graph_label(evidence.EVIDENCE_GRAPH)}　→　**変更後**: {graph_label(evidence.WHATIF_GRAPH)}")
+    st.markdown(f"**変更前**: {state.graph_label(evidence.EVIDENCE_GRAPH)}　→　**変更後**: {state.graph_label(evidence.WHATIF_GRAPH)}")
     include_undetermined = st.checkbox("判定不能も「判定あり」に含める", value=False)
     before, after = lot_sets(before_df, include_undetermined), lot_sets(after_df, include_undetermined)
 
@@ -378,7 +339,7 @@ def tab_whatif() -> None:
                 ident = lot.rsplit("/", 1)[-1]
                 changed = "" if title != "両方" or before[lot] == after[lot] else f" ← {'+'.join(before[lot])}"
                 st.button(f"{ident}  {'+'.join(rules_of[lot])}{changed}", key=f"open_{title}_{ident}",
-                          on_click=open_in_cq06, args=(lot, graph), width="stretch")
+                          on_click=state.open_in_cq06, args=(lot, graph), width="stretch")
     st.caption("ロットを押すとタブ1 の CQ06 で根拠経路を開きます（変更前のみ → 確定の判定、両方・変更後のみ → what-if の判定）。"
                "「両方」で該当ルールが変わったロットは「← 変更前のルール」を併記します。")
 
@@ -387,7 +348,7 @@ def main() -> None:
     st.set_page_config(page_title="KG 予行練習", layout="wide")
     status, show_sparql, explain_on = sidebar()
 
-    tab1, tab2, tab3 = st.tabs([TAB_ASK, TAB_WHATIF, TAB_GRAPH], key="main_tabs", on_change="rerun")
+    tab1, tab2, tab3 = st.tabs([state.TAB_ASK, state.TAB_WHATIF, state.TAB_GRAPH], key=state.MAIN_TABS, on_change="rerun")
     if not status.ok:
         with tab1:
             st.warning("Fuseki に接続できません。サイドバーの接続先を確認してください。")
