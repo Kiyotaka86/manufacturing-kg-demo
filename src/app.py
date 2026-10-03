@@ -92,12 +92,33 @@ def sidebar() -> tuple[fuseki.Status, bool, bool]:
     return status, show_sparql, explain_on
 
 
+def cq05_summary(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """CQ05 の平均日数を Python で計算する（日付の減算は SPARQL 側で行わない。cq05.rq の注記どおり）。
+
+    返り値: (各行に「日数」を足した明細, 設備別の平均日数)
+    """
+    detail = df.copy()
+    detail["日数"] = (pd.to_datetime(detail["nextDefectDate"]) - pd.to_datetime(detail["maint_date"])).dt.days
+    summary = (
+        detail.groupby("equipment", sort=True)["日数"]
+        .agg(平均日数="mean", 保全回数="size", 最短日数="min", 最長日数="max")
+        .reset_index()
+    )
+    summary["平均日数"] = summary["平均日数"].round(1)
+    summary.insert(0, "設備", summary.pop("equipment").str.rsplit("/", n=1).str[-1])
+    return detail, summary
+
+
 def render_table(cq: fuseki.CQ, target: str | None, show_sparql: bool) -> None:
     query, df = fuseki.run_cq(cq, target)
     st.markdown(f"**{len(df)} 件**")
     if show_sparql:
         with st.expander("実行した SPARQL"):
             st.code(query, language="sparql")
+    if cq.id == "cq05" and not df.empty:
+        df, summary = cq05_summary(df)
+        st.markdown("**設備別の平均日数**（保全実施日 → その後最初の不良報告日。Python で計算）")
+        st.dataframe(summary, width="stretch", hide_index=True)
     # CQ01〜05 は結果テーブルが唯一の出力なので開いた状態で出す
     with st.expander("結果テーブル（全列）", expanded=True):
         st.dataframe(df.map(llm.compact), width="stretch", hide_index=True)
