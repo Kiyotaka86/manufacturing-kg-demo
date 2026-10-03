@@ -1,0 +1,11 @@
+# ex:lotMadeOn の実体化
+# owl:propertyChainAxiom ( [owl:inverseOf ex:opLot] ex:opEquipment )
+# Reasoner は使わず、投入時にこの SPARQL UPDATE で urn:derived:chains に書き出す
+PREFIX ex:   <http://example.org/kg/ontology#>
+
+INSERT {
+    GRAPH <urn:derived:chains> { ?lot ex:lotMadeOn ?equipment }
+}
+WHERE {
+    GRAPH <urn:src:lot_operations> { ?op ex:opLot ?lot ; ex:opEquipment ?equipment . }
+}

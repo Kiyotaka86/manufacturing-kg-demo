@@ -1,0 +1,14 @@
+# CQ02: 顧客Zのクレームは、どのロット・工程・部品・サプライヤーに遡れるか？
+# path: defect -> lot -> lot_operations / lot_parts -> purchase -> supplier
+# lotUsesSupplier / lotMadeOn は queries/materialize_*.rq で urn:derived:chains に
+# 実体化済みの propertyChainAxiom ショートカット（src/load.py が投入時に実行する）
+PREFIX ex:   <http://example.org/kg/ontology#>
+PREFIX data: <http://example.org/kg/data/>
+
+SELECT ?defect ?lot ?equipment ?supplier WHERE {
+    VALUES ?customer { <http://example.org/kg/data/customer/C001> }  # 対象顧客はアプリ層で差し替える
+    ?defect ex:defectCustomer ?customer ; ex:defectLot ?lot .
+    OPTIONAL { ?lot ex:lotMadeOn ?equipment . }
+    OPTIONAL { ?lot ex:lotUsesSupplier ?supplier . }
+}
+ORDER BY ?defect

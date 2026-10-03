@@ -1,0 +1,13 @@
+# アプリ用: CQ の対象選択肢。?sample（CQ の VALUES 既定値）と同じクラスの個体を列挙する
+# 表示名は *_name プロパティ（product_name, supplier_name など）があれば使う。無ければアプリ側で ID を表示する
+PREFIX ex: <http://example.org/kg/ontology#>
+
+SELECT ?s (SAMPLE(?n) AS ?name) WHERE {
+    VALUES ?sample { <http://example.org/kg/data/product/P001> }  # アプリ層で差し替える
+    ?sample a ?cls .
+    FILTER(STRSTARTS(STR(?cls), STR(ex:)))
+    ?s a ?cls .
+    OPTIONAL { ?s ?np ?n . FILTER(STRENDS(STR(?np), "_name")) }
+}
+GROUP BY ?s
+ORDER BY ?s

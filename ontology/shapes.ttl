@@ -1,0 +1,105 @@
+@prefix ex:   <http://example.org/kg/ontology#> .
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+# SHACL 形状（第1版）: 必須項目・参照整合性・値域。Evidence の時系列整合性を含む。
+
+ex:ProductShape a sh:NodeShape ; sh:targetClass ex:Product ;
+    sh:property [ sh:path ex:product_id ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ,
+                [ sh:path ex:product_name ; sh:minCount 1 ] ,
+                [ sh:path ex:unit_price ; sh:datatype xsd:integer ; sh:minInclusive 0 ] .
+
+ex:PartShape a sh:NodeShape ; sh:targetClass ex:Part ;
+    sh:property [ sh:path ex:part_id ; sh:minCount 1 ; sh:maxCount 1 ] ,
+                [ sh:path ex:hasSpec ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Spec ] .
+
+ex:SupplierShape a sh:NodeShape ; sh:targetClass ex:Supplier ;
+    sh:property [ sh:path ex:supplier_id ; sh:minCount 1 ; sh:maxCount 1 ] ,
+                [ sh:path ex:rating ; sh:minCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 1 ; sh:maxInclusive 5 ] .
+
+ex:BomLineShape a sh:NodeShape ; sh:targetClass ex:BomLine ;
+    sh:property [ sh:path ex:bomProduct ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Product ] ,
+                [ sh:path ex:bomPart ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Part ] ,
+                [ sh:path ex:quantity ; sh:minCount 1 ; sh:minInclusive 1 ] .
+
+ex:EquipmentShape a sh:NodeShape ; sh:targetClass ex:Equipment ;
+    sh:property [ sh:path ex:equipment_id ; sh:minCount 1 ; sh:maxCount 1 ] ,
+                [ sh:path ex:maint_interval_days ; sh:minCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 1 ] .
+
+ex:SpecShape a sh:NodeShape ; sh:targetClass ex:Spec ;
+    sh:property [ sh:path ex:spec_id ; sh:minCount 1 ; sh:maxCount 1 ] ,
+                [ sh:path ex:min_value ; sh:minCount 1 ; sh:datatype xsd:decimal ] ,
+                [ sh:path ex:max_value ; sh:minCount 1 ; sh:datatype xsd:decimal ] ;
+    sh:sparql [ sh:message "min_value は max_value 以下であること" ;
+                sh:select """SELECT $this WHERE { $this ex:min_value ?mn ; ex:max_value ?mx . FILTER(?mn > ?mx) }""" ] .
+
+ex:PurchaseShape a sh:NodeShape ; sh:targetClass ex:Purchase ;
+    sh:property [ sh:path ex:purchase_id ; sh:minCount 1 ; sh:maxCount 1 ] ,
+                [ sh:path ex:purchasedPart ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Part ] ,
+                [ sh:path ex:purchasedFrom ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Supplier ] ,
+                [ sh:path ex:purchase_date ; sh:minCount 1 ; sh:datatype xsd:date ] .
+
+ex:LotShape a sh:NodeShape ; sh:targetClass ex:Lot ;
+    sh:property [ sh:path ex:lot_id ; sh:minCount 1 ; sh:maxCount 1 ] ,
+                [ sh:path ex:lotProduct ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Product ] ,
+                [ sh:path ex:start_date ; sh:minCount 1 ; sh:datatype xsd:date ] ,
+                [ sh:path ex:status ; sh:minCount 1 ; sh:in ( "完了" "進行中" "出荷保留" ) ] ;
+    sh:sparql [ sh:message "end_date は start_date 以降であること" ;
+                sh:select """SELECT $this WHERE { $this ex:start_date ?s ; ex:end_date ?e . FILTER(?e < ?s) }""" ] .
+
+ex:OperationShape a sh:NodeShape ; sh:targetClass ex:Operation ;
+    sh:property [ sh:path ex:opLot ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Lot ] ,
+                [ sh:path ex:opEquipment ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Equipment ] ,
+                [ sh:path ex:started_at ; sh:minCount 1 ; sh:datatype xsd:dateTime ] .
+
+ex:PartConsumptionShape a sh:NodeShape ; sh:targetClass ex:PartConsumption ;
+    sh:property [ sh:path ex:consumedInLot ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Lot ] ,
+                [ sh:path ex:consumedPurchase ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Purchase ] ,
+                [ sh:path ex:quantity_used ; sh:minCount 1 ; sh:minInclusive 1 ] ;
+    sh:sparql [ sh:message "部品ロットの入荷日はロットの製造開始日以前であること" ;
+                sh:select """SELECT $this WHERE { $this ex:consumedInLot ?lot ; ex:consumedPurchase ?pu .
+                    ?lot ex:start_date ?s . ?pu ex:purchase_date ?p . FILTER(?p > ?s) }""" ] .
+
+ex:InspectionShape a sh:NodeShape ; sh:targetClass ex:Inspection ;
+    sh:property [ sh:path ex:inspectedLot ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Lot ] ,
+                [ sh:path ex:inspectedSpec ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Spec ] ,
+                [ sh:path ex:measured_value ; sh:minCount 1 ; sh:datatype xsd:decimal ] ,
+                [ sh:path ex:result ; sh:minCount 1 ; sh:in ( "OK" "NG" ) ] .
+
+ex:MaintenanceShape a sh:NodeShape ; sh:targetClass ex:Maintenance ;
+    sh:property [ sh:path ex:maintainedEquipment ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Equipment ] ,
+                [ sh:path ex:maint_date ; sh:minCount 1 ; sh:datatype xsd:date ] .
+
+ex:OrderShape a sh:NodeShape ; sh:targetClass ex:Order ;
+    sh:property [ sh:path ex:orderCustomer ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Customer ] ,
+                [ sh:path ex:orderProduct ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Product ] ,
+                [ sh:path ex:shippedLot ; sh:maxCount 1 ; sh:class ex:Lot ] ,
+                [ sh:path ex:due_date ; sh:minCount 1 ; sh:datatype xsd:date ] ,
+                [ sh:path ex:ship_date ; sh:maxCount 1 ; sh:datatype xsd:date ] .
+
+ex:DefectShape a sh:NodeShape ; sh:targetClass ex:Defect ;
+    sh:property [ sh:path ex:defectLot ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Lot ] ,
+                [ sh:path ex:defectCustomer ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Customer ] ,
+                [ sh:path ex:reported_date ; sh:minCount 1 ; sh:datatype xsd:date ] ,
+                [ sh:path ex:severity ; sh:minCount 1 ; sh:in ( "Low" "Medium" "High" ) ] ;
+    sh:sparql [ sh:message "報告日はロット完了日以降であること" ;
+                sh:select """SELECT $this WHERE { $this ex:reported_date ?r ; ex:defectLot ?lot . ?lot ex:end_date ?e . FILTER(?r < ?e) }""" ] .
+
+ex:RuleShape a sh:NodeShape ; sh:targetClass ex:Rule ;
+    sh:property [ sh:path ex:rule_id ; sh:minCount 1 ; sh:maxCount 1 ] ,
+                [ sh:path ex:description ; sh:minCount 1 ] ,
+                [ sh:path ex:conclusion ; sh:minCount 1 ] .
+
+# 説明層: 結論には必ずルールと1件以上の根拠が付き、根拠事実は評価時点より前の日付を持つ
+ex:EvidenceShape a sh:NodeShape ; sh:targetClass ex:Evidence ;
+    sh:property [ sh:path ex:evidenceRule ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Rule ] ,
+                [ sh:path ex:evidenceSubject ; sh:minCount 1 ; sh:maxCount 1 ] ,
+                [ sh:path ex:evidenceFact ; sh:minCount 1 ] ,
+                [ sh:path ex:conclusion ; sh:minCount 1 ] ,
+                [ sh:path ex:evaluatedAt ; sh:minCount 1 ; sh:datatype xsd:dateTime ] ;
+    sh:sparql [ sh:message "根拠事実の日付が評価時点より後になっている（時系列矛盾）" ;
+                sh:select """SELECT $this ?fact WHERE {
+                    $this ex:evaluatedAt ?t ; ex:evidenceFact ?fact .
+                    ?fact ?p ?d . FILTER(datatype(?d) = xsd:date || datatype(?d) = xsd:dateTime)
+                    FILTER(xsd:dateTime(?d) > ?t) }""" ] .

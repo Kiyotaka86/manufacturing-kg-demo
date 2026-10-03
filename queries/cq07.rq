@@ -1,0 +1,24 @@
+# CQ07: 製品Xの不良増加の原因候補をルールに基づき順位付けし、根拠経路を示せ (R01, R02, R07)
+# path: product -> lots -> defects -> 部品／設備／工程で分岐
+#
+# 簡略化: ここでは製品に紐づくロットの不良を、原因候補（サプライヤー起因 / 設備起因）別に
+# 件数集計するところまでを行う。R01（サプライヤー不良率）・R02（保全間隔超過）・R07（設備起因疑い）
+# を加味した最終的な順位付けはアプリ層で、本結果と queries/cq04.rq（供給元不良率）・
+# queries/cq06.rq（個別ロット判定）を組み合わせて行う。
+PREFIX ex:   <http://example.org/kg/ontology#>
+PREFIX data: <http://example.org/kg/data/>
+
+SELECT ?product ?cause ?causeType (COUNT(DISTINCT ?defect) AS ?defectCount) WHERE {
+    VALUES ?product { <http://example.org/kg/data/product/P001> }  # 対象製品はアプリ層で差し替える
+    ?lot ex:lotProduct ?product .
+    ?defect ex:defectLot ?lot .
+    {
+        ?lot ex:lotUsesSupplier ?cause .
+        BIND("supplier" AS ?causeType)
+    } UNION {
+        ?lot ex:lotMadeOn ?cause .
+        BIND("equipment" AS ?causeType)
+    }
+}
+GROUP BY ?product ?cause ?causeType
+ORDER BY DESC(?defectCount)

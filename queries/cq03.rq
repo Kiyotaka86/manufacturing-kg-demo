@@ -1,0 +1,12 @@
+# CQ03: サプライヤーSの部品を使った製品は、どの顧客に出荷済みか？ (related_rules: R08)
+# path: supplier -> purchase -> lot_parts -> lot -> orders_shipments -> customer
+PREFIX ex:   <http://example.org/kg/ontology#>
+PREFIX data: <http://example.org/kg/data/>
+
+SELECT DISTINCT ?product ?customer WHERE {
+    VALUES ?supplier { <http://example.org/kg/data/supplier/S005> }  # 対象サプライヤーはアプリ層で差し替える
+    ?lot ex:lotUsesSupplier ?supplier ;
+         ex:lotProduct ?product .
+    ?order ex:shippedLot ?lot ; ex:orderCustomer ?customer .
+}
+ORDER BY ?product ?customer

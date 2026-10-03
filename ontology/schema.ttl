@@ -1,0 +1,194 @@
+@prefix ex:   <http://example.org/kg/ontology#> .
+@prefix data: <http://example.org/kg/data/> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+
+# =====================================================================
+# 製造・品質トレーサビリティ オントロジー（予行練習用・名前空間は仮）
+# 15 データソース → 15 クラス、説明層として Rule / Evidence を追加
+# 名前付きグラフ: urn:src:<sheet名>  インスタンスURI: data:<class>/<id>
+# =====================================================================
+
+<http://example.org/kg/ontology> a owl:Ontology ;
+    rdfs:label "Manufacturing Quality Traceability Ontology (rehearsal)"@en ;
+    owl:versionInfo "0.1" .
+
+# ---------------------------------------------------------------------
+# クラス: マスタ
+# ---------------------------------------------------------------------
+ex:Product   a owl:Class ; rdfs:label "製品"@ja ; rdfs:comment "products シート"@ja .
+ex:Part      a owl:Class ; rdfs:label "部品"@ja ; rdfs:comment "parts シート"@ja .
+ex:Supplier  a owl:Class ; rdfs:label "サプライヤー"@ja ; rdfs:comment "suppliers シート"@ja .
+ex:Customer  a owl:Class ; rdfs:label "顧客"@ja ; rdfs:comment "customers シート"@ja .
+ex:Equipment a owl:Class ; rdfs:label "設備"@ja ; rdfs:comment "equipment シート"@ja .
+ex:Spec      a owl:Class ; rdfs:label "規格要件"@ja ; rdfs:comment "specs シート"@ja .
+
+# ---------------------------------------------------------------------
+# クラス: 構成・実績（関係を担うレコード）
+# ---------------------------------------------------------------------
+ex:BomLine         a owl:Class ; rdfs:label "部品表行"@ja ; rdfs:comment "bom シート（製品×部品）"@ja .
+ex:Purchase        a owl:Class ; rdfs:label "購買（部品ロット）"@ja ; rdfs:comment "purchases シート"@ja .
+ex:Lot             a owl:Class ; rdfs:label "製造ロット"@ja ; rdfs:comment "lots シート"@ja .
+ex:Operation       a owl:Class ; rdfs:label "工程実績"@ja ; rdfs:comment "lot_operations シート"@ja .
+ex:PartConsumption a owl:Class ; rdfs:label "ロット部品消費"@ja ; rdfs:comment "lot_parts シート"@ja .
+ex:Inspection      a owl:Class ; rdfs:label "検査結果"@ja ; rdfs:comment "inspections シート"@ja .
+ex:Maintenance     a owl:Class ; rdfs:label "保全履歴"@ja ; rdfs:comment "maintenance シート"@ja .
+ex:Order           a owl:Class ; rdfs:label "受注・出荷"@ja ; rdfs:comment "orders_shipments シート"@ja .
+ex:Defect          a owl:Class ; rdfs:label "不良・クレーム"@ja ; rdfs:comment "defects シート"@ja .
+
+# ---------------------------------------------------------------------
+# クラス: 説明層
+# ---------------------------------------------------------------------
+ex:Rule a owl:Class ;
+    rdfs:label "判断ルール"@ja ;
+    rdfs:comment "rules シート。判定は SPARQL/Python が行い、Rule は閾値と説明文を保持する"@ja .
+
+ex:Evidence a owl:Class ;
+    rdfs:label "判定根拠"@ja ;
+    rdfs:comment "判定の結論・適用ルール・根拠事実へのリンクを持つ。LLM はこれを自然文に変換する"@ja .
+
+# ---------------------------------------------------------------------
+# オブジェクトプロパティ
+# ---------------------------------------------------------------------
+ex:bomProduct a owl:ObjectProperty ; rdfs:domain ex:BomLine ; rdfs:range ex:Product ; rdfs:label "部品表の製品"@ja .
+ex:bomPart    a owl:ObjectProperty ; rdfs:domain ex:BomLine ; rdfs:range ex:Part    ; rdfs:label "部品表の部品"@ja .
+ex:hasSpec    a owl:ObjectProperty ; rdfs:domain ex:Part    ; rdfs:range ex:Spec    ; rdfs:label "適用規格"@ja .
+
+ex:purchasedPart a owl:ObjectProperty ; rdfs:domain ex:Purchase ; rdfs:range ex:Part     ; rdfs:label "購買部品"@ja .
+ex:purchasedFrom a owl:ObjectProperty ; rdfs:domain ex:Purchase ; rdfs:range ex:Supplier ; rdfs:label "購買先"@ja .
+
+ex:lotProduct  a owl:ObjectProperty ; rdfs:domain ex:Lot       ; rdfs:range ex:Product   ; rdfs:label "ロットの製品"@ja .
+ex:opLot       a owl:ObjectProperty ; rdfs:domain ex:Operation ; rdfs:range ex:Lot       ; rdfs:label "工程のロット"@ja .
+ex:opEquipment a owl:ObjectProperty ; rdfs:domain ex:Operation ; rdfs:range ex:Equipment ; rdfs:label "工程の設備"@ja .
+
+ex:consumedInLot    a owl:ObjectProperty ; rdfs:domain ex:PartConsumption ; rdfs:range ex:Lot      ; rdfs:label "消費先ロット"@ja .
+ex:consumedPurchase a owl:ObjectProperty ; rdfs:domain ex:PartConsumption ; rdfs:range ex:Purchase ; rdfs:label "消費した部品ロット"@ja .
+
+ex:inspectedLot  a owl:ObjectProperty ; rdfs:domain ex:Inspection ; rdfs:range ex:Lot  ; rdfs:label "検査対象ロット"@ja .
+ex:inspectedSpec a owl:ObjectProperty ; rdfs:domain ex:Inspection ; rdfs:range ex:Spec ; rdfs:label "検査規格"@ja .
+
+ex:maintainedEquipment a owl:ObjectProperty ; rdfs:domain ex:Maintenance ; rdfs:range ex:Equipment ; rdfs:label "保全対象設備"@ja .
+
+ex:orderCustomer a owl:ObjectProperty ; rdfs:domain ex:Order ; rdfs:range ex:Customer ; rdfs:label "受注顧客"@ja .
+ex:orderProduct  a owl:ObjectProperty ; rdfs:domain ex:Order ; rdfs:range ex:Product  ; rdfs:label "受注製品"@ja .
+ex:shippedLot    a owl:ObjectProperty ; rdfs:domain ex:Order ; rdfs:range ex:Lot      ; rdfs:label "出荷ロット"@ja .
+
+ex:defectLot      a owl:ObjectProperty ; rdfs:domain ex:Defect ; rdfs:range ex:Lot      ; rdfs:label "不良発生ロット"@ja .
+ex:defectCustomer a owl:ObjectProperty ; rdfs:domain ex:Defect ; rdfs:range ex:Customer ; rdfs:label "報告顧客"@ja .
+
+# 説明層
+ex:evidenceRule       a owl:ObjectProperty ; rdfs:domain ex:Evidence ; rdfs:range ex:Rule ; rdfs:label "適用ルール"@ja .
+ex:evidenceSubject    a owl:ObjectProperty ; rdfs:domain ex:Evidence ; rdfs:label "判定対象（Lot/Order/Part 等）"@ja .
+ex:evidenceFact       a owl:ObjectProperty ; rdfs:domain ex:Evidence ; rdfs:label "根拠事実ノード（複数可）"@ja .
+ex:ruleTargetClass    a owl:ObjectProperty ; rdfs:domain ex:Rule ; rdfs:range owl:Class ; rdfs:label "ルール適用クラス"@ja .
+
+# 推論用の短絡プロパティ（プロパティチェーンで導出、または投入時に実体化）
+ex:lotUsesSupplier a owl:ObjectProperty ; rdfs:domain ex:Lot ; rdfs:range ex:Supplier ;
+    rdfs:label "ロットが使用するサプライヤー"@ja ;
+    owl:propertyChainAxiom ( [ owl:inverseOf ex:consumedInLot ] ex:consumedPurchase ex:purchasedFrom ) .
+ex:lotMadeOn a owl:ObjectProperty ; rdfs:domain ex:Lot ; rdfs:range ex:Equipment ;
+    rdfs:label "ロットの製造設備"@ja ;
+    owl:propertyChainAxiom ( [ owl:inverseOf ex:opLot ] ex:opEquipment ) .
+
+# ---------------------------------------------------------------------
+# データタイププロパティ（列名をそのまま ex:<列名> にマッピング）
+# ---------------------------------------------------------------------
+ex:product_id   a owl:DatatypeProperty ; rdfs:domain ex:Product   ; rdfs:range xsd:string .
+ex:product_name a owl:DatatypeProperty ; rdfs:domain ex:Product   ; rdfs:range xsd:string .
+ex:category     a owl:DatatypeProperty ; rdfs:domain ex:Product   ; rdfs:range xsd:string .
+ex:unit_price   a owl:DatatypeProperty ; rdfs:domain ex:Product   ; rdfs:range xsd:integer .
+
+ex:part_id   a owl:DatatypeProperty ; rdfs:domain ex:Part ; rdfs:range xsd:string .
+ex:part_name a owl:DatatypeProperty ; rdfs:domain ex:Part ; rdfs:range xsd:string .
+ex:part_type a owl:DatatypeProperty ; rdfs:domain ex:Part ; rdfs:range xsd:string .
+ex:unit      a owl:DatatypeProperty ; rdfs:range xsd:string .
+
+ex:supplier_id   a owl:DatatypeProperty ; rdfs:domain ex:Supplier ; rdfs:range xsd:string .
+ex:supplier_name a owl:DatatypeProperty ; rdfs:domain ex:Supplier ; rdfs:range xsd:string .
+ex:region        a owl:DatatypeProperty ; rdfs:range xsd:string .
+ex:rating        a owl:DatatypeProperty ; rdfs:domain ex:Supplier ; rdfs:range xsd:integer .
+
+ex:customer_id   a owl:DatatypeProperty ; rdfs:domain ex:Customer ; rdfs:range xsd:string .
+ex:customer_name a owl:DatatypeProperty ; rdfs:domain ex:Customer ; rdfs:range xsd:string .
+ex:industry      a owl:DatatypeProperty ; rdfs:domain ex:Customer ; rdfs:range xsd:string .
+
+ex:bom_id   a owl:DatatypeProperty ; rdfs:domain ex:BomLine ; rdfs:range xsd:string .
+ex:quantity a owl:DatatypeProperty ; rdfs:range xsd:integer .
+
+ex:equipment_id        a owl:DatatypeProperty ; rdfs:domain ex:Equipment ; rdfs:range xsd:string .
+ex:equipment_name      a owl:DatatypeProperty ; rdfs:domain ex:Equipment ; rdfs:range xsd:string .
+ex:line                a owl:DatatypeProperty ; rdfs:domain ex:Equipment ; rdfs:range xsd:string .
+ex:install_date        a owl:DatatypeProperty ; rdfs:domain ex:Equipment ; rdfs:range xsd:date .
+ex:maint_interval_days a owl:DatatypeProperty ; rdfs:domain ex:Equipment ; rdfs:range xsd:integer .
+
+ex:spec_id   a owl:DatatypeProperty ; rdfs:domain ex:Spec ; rdfs:range xsd:string .
+ex:spec_name a owl:DatatypeProperty ; rdfs:domain ex:Spec ; rdfs:range xsd:string .
+ex:parameter a owl:DatatypeProperty ; rdfs:domain ex:Spec ; rdfs:range xsd:string .
+ex:min_value a owl:DatatypeProperty ; rdfs:domain ex:Spec ; rdfs:range xsd:decimal .
+ex:max_value a owl:DatatypeProperty ; rdfs:domain ex:Spec ; rdfs:range xsd:decimal .
+
+ex:purchase_id   a owl:DatatypeProperty ; rdfs:domain ex:Purchase ; rdfs:range xsd:string .
+ex:purchase_date a owl:DatatypeProperty ; rdfs:domain ex:Purchase ; rdfs:range xsd:date .
+ex:part_lot_no   a owl:DatatypeProperty ; rdfs:domain ex:Purchase ; rdfs:range xsd:string .
+
+ex:lot_id     a owl:DatatypeProperty ; rdfs:domain ex:Lot ; rdfs:range xsd:string .
+ex:start_date a owl:DatatypeProperty ; rdfs:domain ex:Lot ; rdfs:range xsd:date .
+ex:end_date   a owl:DatatypeProperty ; rdfs:domain ex:Lot ; rdfs:range xsd:date .
+ex:status     a owl:DatatypeProperty ; rdfs:domain ex:Lot ; rdfs:range xsd:string .
+
+ex:op_id        a owl:DatatypeProperty ; rdfs:domain ex:Operation ; rdfs:range xsd:string .
+ex:process_name a owl:DatatypeProperty ; rdfs:domain ex:Operation ; rdfs:range xsd:string .
+ex:sequence_no  a owl:DatatypeProperty ; rdfs:domain ex:Operation ; rdfs:range xsd:integer .
+ex:started_at   a owl:DatatypeProperty ; rdfs:domain ex:Operation ; rdfs:range xsd:dateTime .
+
+ex:lp_id         a owl:DatatypeProperty ; rdfs:domain ex:PartConsumption ; rdfs:range xsd:string .
+ex:quantity_used a owl:DatatypeProperty ; rdfs:domain ex:PartConsumption ; rdfs:range xsd:integer .
+
+ex:inspection_id  a owl:DatatypeProperty ; rdfs:domain ex:Inspection ; rdfs:range xsd:string .
+ex:measured_value a owl:DatatypeProperty ; rdfs:domain ex:Inspection ; rdfs:range xsd:decimal .
+ex:result         a owl:DatatypeProperty ; rdfs:domain ex:Inspection ; rdfs:range xsd:string .
+ex:inspected_at   a owl:DatatypeProperty ; rdfs:domain ex:Inspection ; rdfs:range xsd:dateTime .
+
+ex:maint_id       a owl:DatatypeProperty ; rdfs:domain ex:Maintenance ; rdfs:range xsd:string .
+ex:maint_date     a owl:DatatypeProperty ; rdfs:domain ex:Maintenance ; rdfs:range xsd:date .
+ex:maint_type     a owl:DatatypeProperty ; rdfs:domain ex:Maintenance ; rdfs:range xsd:string .
+ex:downtime_hours a owl:DatatypeProperty ; rdfs:domain ex:Maintenance ; rdfs:range xsd:integer .
+
+ex:order_id   a owl:DatatypeProperty ; rdfs:domain ex:Order ; rdfs:range xsd:string .
+ex:order_date a owl:DatatypeProperty ; rdfs:domain ex:Order ; rdfs:range xsd:date .
+ex:due_date   a owl:DatatypeProperty ; rdfs:domain ex:Order ; rdfs:range xsd:date .
+ex:ship_date  a owl:DatatypeProperty ; rdfs:domain ex:Order ; rdfs:range xsd:date .
+
+ex:defect_id     a owl:DatatypeProperty ; rdfs:domain ex:Defect ; rdfs:range xsd:string .
+ex:defect_type   a owl:DatatypeProperty ; rdfs:domain ex:Defect ; rdfs:range xsd:string .
+ex:reported_date a owl:DatatypeProperty ; rdfs:domain ex:Defect ; rdfs:range xsd:date .
+ex:severity      a owl:DatatypeProperty ; rdfs:domain ex:Defect ; rdfs:range xsd:string .
+
+# 説明層
+ex:rule_id        a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:range xsd:string .
+ex:rule_name      a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:range xsd:string .
+ex:description    a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:range xsd:string .
+ex:threshold      a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:comment "数値または文字列。threshold_unit で解釈"@ja .
+ex:threshold_unit a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:range xsd:string .
+ex:conclusion     a owl:DatatypeProperty ; rdfs:range xsd:string ;
+    rdfs:comment "Rule では想定結論、Evidence では実際の結論"@ja .
+ex:observedValue  a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:range xsd:decimal ;
+    rdfs:comment "閾値と比較した実測値（例: 不良率 0.67）"@ja .
+ex:evaluatedAt    a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:range xsd:dateTime .
+ex:explanation    a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:range xsd:string ;
+    rdfs:comment "Claude が生成した自然文の説明（任意）"@ja .
+
+# ---------------------------------------------------------------------
+# インスタンス例（投入時の形）
+# ---------------------------------------------------------------------
+# data:lot/L0003 a ex:Lot ; ex:lot_id "L0003" ; ex:lotProduct data:product/P003 ;
+#     ex:start_date "2026-05-04"^^xsd:date ; ex:status "完了" .
+# data:evidence/EV0001 a ex:Evidence ;
+#     ex:evidenceSubject data:lot/L0003 ; ex:evidenceRule data:rule/R01 ;
+#     ex:evidenceFact data:lot_parts/LP003 , data:purchase/PU006 , data:supplier/S005 ;
+#     ex:observedValue 0.67 ; ex:conclusion "要注意" ;
+#     ex:evaluatedAt "2026-09-17T10:00:00"^^xsd:dateTime .

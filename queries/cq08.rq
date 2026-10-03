@@ -1,0 +1,31 @@
+# CQ08: サプライヤーSの代替候補は？根拠付き (R04: 低評価サプライヤー, R05: 代替サプライヤー条件)
+# path: part -> spec -> 同spec部品 -> supplier -> 不良率
+PREFIX ex:   <http://example.org/kg/ontology#>
+PREFIX data: <http://example.org/kg/data/>
+
+SELECT DISTINCT ?part ?altPart ?altSupplier ?altDefectRate WHERE {
+    VALUES ?supplier { <http://example.org/kg/data/supplier/S005> }  # 対象サプライヤーはアプリ層で差し替える
+    ?supplier ex:rating ?rating .
+    <http://example.org/kg/data/rule/R04> ex:threshold ?r04Threshold .
+    FILTER(?rating < ?r04Threshold)
+
+    ?purchase ex:purchasedFrom ?supplier ; ex:purchasedPart ?part .
+    ?part ex:hasSpec ?spec .
+    ?altPart ex:hasSpec ?spec .
+    FILTER(?altPart != ?part)
+
+    ?altPurchase ex:purchasedPart ?altPart ; ex:purchasedFrom ?altSupplier .
+    FILTER(?altSupplier != ?supplier)
+
+    <http://example.org/kg/data/rule/R05> ex:threshold ?r05Threshold .
+    {
+        SELECT ?altSupplier (COUNT(DISTINCT ?l) AS ?lotCount) (COUNT(DISTINCT ?d) AS ?defectCount) WHERE {
+            ?c ex:consumedPurchase ?p ; ex:consumedInLot ?l .
+            ?p ex:purchasedFrom ?altSupplier .
+            OPTIONAL { ?d ex:defectLot ?l }
+        } GROUP BY ?altSupplier
+    }
+    BIND(IF(?lotCount = 0, 0, ?defectCount / ?lotCount) AS ?altDefectRate)
+    FILTER(?altDefectRate <= ?r05Threshold)
+}
+ORDER BY ?part ?altDefectRate

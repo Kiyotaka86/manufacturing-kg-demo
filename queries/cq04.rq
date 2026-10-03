@@ -1,0 +1,25 @@
+# CQ04: サプライヤー別・部品別の直近3ロット不良率は？ (related_rules: R01, threshold=0.05 ratio)
+# path: supplier -> purchase -> lot_parts -> lot -> defects（集計）
+#
+# 簡略化: SPARQL 1.1 では「グループごとに直近3件」のウィンドウ集計を素直に表現できないため、
+# ここではサプライヤー×部品の組み合わせに紐づく全ロットに対する不良率を計算する。
+# 厳密な「直近3ロット」に絞る場合はアプリ層（Python）で lot.start_date 降順に3件へ絞ってから
+# 本クエリと同じ計算をポスト処理する。
+# 閾値はハードコードせず data:rule/R01 の ex:threshold から取得する（判定根拠を経路で追える）。
+PREFIX ex:   <http://example.org/kg/ontology#>
+PREFIX data: <http://example.org/kg/data/>
+
+SELECT ?supplier ?part
+       (COUNT(DISTINCT ?lot) AS ?lotCount)
+       (COUNT(DISTINCT ?defect) AS ?defectCount)
+       ((COUNT(DISTINCT ?defect)) / (COUNT(DISTINCT ?lot)) AS ?defectRate)
+       ?threshold
+WHERE {
+    ?consumption ex:consumedInLot ?lot ; ex:consumedPurchase ?purchase .
+    ?purchase ex:purchasedPart ?part ; ex:purchasedFrom ?supplier .
+    OPTIONAL { ?defect ex:defectLot ?lot }
+    <http://example.org/kg/data/rule/R01> ex:threshold ?threshold .
+}
+GROUP BY ?supplier ?part ?threshold
+HAVING (COUNT(DISTINCT ?defect) / COUNT(DISTINCT ?lot) >= ?threshold)
+ORDER BY DESC(?defectRate)

@@ -1,0 +1,6 @@
+@prefix ex:   <http://example.org/kg/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:part001 a ex:Part ;
+    rdfs:label "サンプル部品001" ;
+    ex:producedBy ex:line001 .

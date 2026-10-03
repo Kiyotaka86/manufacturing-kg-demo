@@ -1,0 +1,12 @@
+# ex:lotUsesSupplier の実体化
+# owl:propertyChainAxiom ( [owl:inverseOf ex:consumedInLot] ex:consumedPurchase ex:purchasedFrom )
+# Reasoner は使わず、投入時にこの SPARQL UPDATE で urn:derived:chains に書き出す
+PREFIX ex:   <http://example.org/kg/ontology#>
+
+INSERT {
+    GRAPH <urn:derived:chains> { ?lot ex:lotUsesSupplier ?supplier }
+}
+WHERE {
+    GRAPH <urn:src:lot_parts> { ?consumption ex:consumedInLot ?lot ; ex:consumedPurchase ?purchase . }
+    GRAPH <urn:src:purchases> { ?purchase ex:purchasedFrom ?supplier . }
+}

@@ -1,0 +1,25 @@
+# CQ10: ルールRの閾値を変更した場合、判定が変わるロットはどれか（R01の閾値を例に what-if 比較）
+# path: rules（閾値差替）-> 再判定 -> 差分
+#
+# ?oldThreshold は <http://example.org/kg/data/rule/R01> の現在値（0.05）、?newThreshold はアプリ層が提示する
+# 差し替え候補値。両方の閾値で「要注意」判定が割れるサプライヤー＝影響を受けるロットを返す。
+PREFIX ex:   <http://example.org/kg/ontology#>
+PREFIX data: <http://example.org/kg/data/>
+
+SELECT ?supplier ?lot ?defectRate ?oldThreshold ?newThreshold WHERE {
+    <http://example.org/kg/data/rule/R01> ex:threshold ?oldThreshold .
+    VALUES ?newThreshold { 0.10 }  # 差し替え候補値の例。アプリ層で差し替える
+
+    {
+        SELECT ?supplier (COUNT(DISTINCT ?l) AS ?lotCount) (COUNT(DISTINCT ?d) AS ?defectCount) WHERE {
+            ?c ex:consumedPurchase ?p ; ex:consumedInLot ?l .
+            ?p ex:purchasedFrom ?supplier .
+            OPTIONAL { ?d ex:defectLot ?l }
+        } GROUP BY ?supplier
+    }
+    BIND(?defectCount / ?lotCount AS ?defectRate)
+    FILTER((?defectRate >= ?oldThreshold) != (?defectRate >= ?newThreshold))
+
+    ?lot ex:lotUsesSupplier ?supplier .
+}
+ORDER BY ?supplier ?lot

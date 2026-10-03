@@ -1,0 +1,17 @@
+# CQ05: 設備別の、保全実施から次の不良発生までの平均日数は？ (related_rules: R02, R07)
+# path: equipment -> maintenance / lot_operations -> lot -> defects（集計）
+#
+# 簡略化: 日付の平均計算は SPARQL/エンジン間で xsd:date の減算・変換の扱いが揺れるため、
+# ここでは「各保全実施日ごとに、その後最初に発生した不良の報告日」までを1行ずつ返す。
+# 平均日数（(nextDefectDate - maint_date) の平均）はアプリ層（Python）で計算する
+# （CLAUDE.md: 数値計算はSPARQL/Python側、LLMには結果の説明のみ担わせる）。
+PREFIX ex:   <http://example.org/kg/ontology#>
+
+SELECT ?equipment ?maint_date (MIN(?defect_date) AS ?nextDefectDate) WHERE {
+    ?maint ex:maintainedEquipment ?equipment ; ex:maint_date ?maint_date .
+    ?lot ex:lotMadeOn ?equipment .
+    ?defect ex:defectLot ?lot ; ex:reported_date ?defect_date .
+    FILTER(?defect_date > ?maint_date)
+}
+GROUP BY ?equipment ?maint_date
+ORDER BY ?equipment ?maint_date

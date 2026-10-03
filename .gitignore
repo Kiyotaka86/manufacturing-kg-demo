@@ -1,0 +1,8 @@
+.env
+run/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+.ipynb_checkpoints/
+.ruff_cache/

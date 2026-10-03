@@ -1,0 +1,16 @@
+# CQ01: 製品Xを構成する部品と、各部品のサプライヤーは？
+# path: product -> bom -> part -> purchase -> supplier
+# tdb2:unionDefaultGraph=true のため、GRAPH句なしで全名前付きグラフを横断できる
+PREFIX ex:   <http://example.org/kg/ontology#>
+PREFIX data: <http://example.org/kg/data/>
+
+SELECT ?part ?partName ?supplier ?supplierName WHERE {
+    VALUES ?product { <http://example.org/kg/data/product/P001> }  # 対象製品はアプリ層で差し替える
+    ?bom ex:bomProduct ?product ; ex:bomPart ?part .
+    ?part ex:part_name ?partName .
+    OPTIONAL {
+        ?purchase ex:purchasedPart ?part ; ex:purchasedFrom ?supplier .
+        ?supplier ex:supplier_name ?supplierName .
+    }
+}
+ORDER BY ?part ?supplier

@@ -1,0 +1,19 @@
+@prefix :       <http://localhost/fuseki/config#> .
+@prefix fuseki: <http://jena.apache.org/fuseki#> .
+@prefix rdf:    <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix tdb2:   <http://jena.apache.org/2016/tdb#> .
+@prefix ja:     <http://jena.hpl.hp.com/2005/11/Assembler#> .
+
+[] rdf:type fuseki:Server ;
+   fuseki:services ( :kg ) .
+
+:kg rdf:type fuseki:Service ;
+   fuseki:name "kg" ;
+   fuseki:endpoint [ fuseki:operation fuseki:query ; fuseki:name "query" ] ;
+   fuseki:endpoint [ fuseki:operation fuseki:update ; fuseki:name "update" ] ;
+   fuseki:endpoint [ fuseki:operation fuseki:gsp-rw ; fuseki:name "data" ] ;
+   fuseki:dataset :kgDataset .
+
+:kgDataset rdf:type tdb2:DatasetTDB2 ;
+   tdb2:location "run/databases/kg" ;
+   tdb2:unionDefaultGraph true .

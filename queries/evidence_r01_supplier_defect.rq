@@ -1,0 +1,54 @@
+# R01: サプライヤー別の不良率が閾値を超える場合、そのサプライヤーの部品を使ったロットを要注意と判定する。
+#
+# 計算と判定はこのクエリ内で完結し、結果を ex:Evidence として urn:src:evidence に書き戻す。
+# 閾値は data:rule/R01 から読むため、rules シートの値を変えるだけで再判定できる（CQ10 の基盤）。
+#
+# 実行前に必ず  CLEAR SILENT GRAPH <urn:src:evidence>  を流すこと（load.py の chains と同じ理由）。
+# USING は、データが名前付きグラフにあるため必須。省くと WHERE が既定グラフだけを見て 0 件になる。
+#
+# 閾値の較正について（要判断）:
+#   threshold=0.05 → 8 サプライヤー該当・80 ロット中 60 ロットが要注意（判定が効いていない）
+#   threshold=0.30 → 4 サプライヤー該当・27 ロット
+#   threshold=0.50 → S005 のみ該当・20 ロット
+# rules シートの R01 は 0.05。デモでは 0.30 前後に上げるか、ルール文どおり「直近3ロット」に
+# window を絞るかのいずれかが必要。この較正作業自体が本番でも必ず発生する。
+PREFIX ex:   <http://example.org/kg/ontology#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+INSERT {
+  GRAPH <urn:src:evidence> {
+    ?ev a ex:Evidence ;
+        ex:evidenceSubject ?lot ;
+        ex:evidenceRule    ?rule ;
+        ex:evidenceFact    ?lp , ?pu , ?sup ;
+        ex:observedValue   ?rate ;
+        ex:conclusion      ?conclusion ;
+        ex:evaluatedAt     ?now .
+  }
+}
+USING <urn:x-arq:UnionGraph>
+WHERE {
+  # 1. サプライヤー別の不良率を集計する
+  {
+    SELECT ?sup (xsd:decimal(COUNT(DISTINCT ?defLot)) / xsd:decimal(COUNT(DISTINCT ?anyLot)) AS ?rate)
+    WHERE {
+      ?c ex:consumedInLot ?anyLot ; ex:consumedPurchase ?p .
+      ?p ex:purchasedFrom ?sup .
+      OPTIONAL { ?d ex:defectLot ?anyLot . BIND(?anyLot AS ?defLot) }
+    }
+    GROUP BY ?sup
+    HAVING (COUNT(DISTINCT ?anyLot) > 0)
+  }
+
+  # 2. 閾値をルールから読み、超えたサプライヤーだけ残す
+  ?rule ex:rule_id "R01" ; ex:threshold ?threshold ; ex:conclusion ?conclusion .
+  FILTER(?rate > ?threshold)
+
+  # 3. 該当サプライヤーの部品を消費したロットを判定対象にする
+  ?lp ex:consumedInLot ?lot ; ex:consumedPurchase ?pu .
+  ?pu ex:purchasedFrom ?sup .
+
+  BIND(NOW() AS ?now)
+  BIND(IRI(CONCAT("http://example.org/kg/data/evidence/R01-",
+                  STRAFTER(STR(?lot), "/lot/"))) AS ?ev)
+}

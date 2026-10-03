@@ -1,0 +1,17 @@
+# CQ09: 受注Oが納期遅延するリスクの理由は？ (R06: 納期遅延リスク, R02: 保全間隔超過)
+# path: order -> lot -> lot_operations -> equipment -> maintenance
+#
+# 簡略化: 「納期までの残日数 < 製造リードタイム」の日数比較はエンジン依存の日付演算になるため、
+# ここでは判定に必要な生データ（未完了ロットの納期・状態・製造設備・直近保全日）を1行で返し、
+# 残日数としきい値（R06のthreshold）との比較はアプリ層（Python）で行う。
+PREFIX ex:   <http://example.org/kg/ontology#>
+PREFIX data: <http://example.org/kg/data/>
+
+SELECT ?order ?dueDate ?lot ?status ?equipment ?leadTimeThreshold WHERE {
+    VALUES ?order { <http://example.org/kg/data/order/O001> }  # 対象受注はアプリ層で差し替える
+    ?order ex:shippedLot ?lot ; ex:due_date ?dueDate .
+    ?lot ex:status ?status .
+    FILTER(?status != "完了")
+    OPTIONAL { ?lot ex:lotMadeOn ?equipment }
+    <http://example.org/kg/data/rule/R06> ex:threshold ?leadTimeThreshold
+}
