@@ -21,7 +21,7 @@ import evidence
 import fuseki
 import llm
 import viz
-from ui import cache, state
+from ui import cache, state, tab_graph
 
 TABLE_ONLY_CQS = {"cq01", "cq02", "cq03", "cq04", "cq05"}
 # 判定系 CQ（Evidence を判定・経路・説明文で示す）と、Evidence の集計で順位を付ける CQ
@@ -362,22 +362,7 @@ def main() -> None:
             tab_whatif()
     if tab3.open:
         with tab3:
-            tab_graph()
-
-
-def tab_graph() -> None:
-    """タブ3: 投入状態の確認（グラフ別・クラス別の件数）。個体の周辺探索は未実装。"""
-    cols = st.columns(2)
-    with cols[0]:
-        st.markdown("#### グラフ別トリプル数")
-        graphs = fuseki.select(fuseki.load_query("app_graph_counts.rq"))
-        graphs["triples"] = graphs["triples"].astype(int)
-        st.dataframe(graphs, width="stretch", hide_index=True)
-        st.caption(f"{len(graphs)} グラフ・{graphs.triples.sum():,} トリプル（スキーマ urn:schema:kg を含む全名前付きグラフ）")
-    with cols[1]:
-        st.markdown("#### クラス別インスタンス数")
-        classes = fuseki.select(fuseki.load_query("app_class_counts.rq"))
-        st.dataframe(classes.map(llm.compact), width="stretch", hide_index=True)
+            tab_graph.render()
 
 
 main()
