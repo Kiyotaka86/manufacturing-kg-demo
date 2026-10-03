@@ -1,0 +1,17 @@
+# アプリ用: 1 ロットの Evidence が指す根拠ノード（subject / fact）のリテラル属性
+# 例: 検査結果の measured_value・result、規格の min_value・max_value・unit、保全の maint_date、
+#     設備の maint_interval_days、ロットの start_date。説明文生成と経路グラフのツールチップに使う。
+# *_id（IRI と重複）と *_name（evidence_detail.rq で返す）は除く。
+PREFIX ex: <http://example.org/kg/ontology#>
+
+SELECT DISTINCT ?node ?p ?o WHERE {
+    VALUES ?lot { <http://example.org/kg/data/lot/L0037> }  # アプリ層で差し替える
+    GRAPH <urn:src:evidence> {
+        ?evidence ex:evidenceSubject ?lot .
+        ?evidence ex:evidenceSubject|ex:evidenceFact ?node .
+    }
+    ?node ?p ?o .
+    FILTER(isLiteral(?o) && STRSTARTS(STR(?p), STR(ex:)))
+    FILTER(!STRENDS(STR(?p), "_id") && !STRENDS(STR(?p), "_name"))
+}
+ORDER BY ?node ?p

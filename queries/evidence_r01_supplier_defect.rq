@@ -24,6 +24,7 @@ INSERT {
         ex:observedValue   ?rate ;
         ex:observedNumerator   ?defectLots ;
         ex:observedDenominator ?totalLots ;
+        ex:appliedThreshold ?threshold ;
         ex:conclusion      ?conclusion ;
         ex:evaluatedAt     ?now .
   }

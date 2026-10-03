@@ -1,0 +1,44 @@
+# R03: 検査結果に NG が閾値（1件）以上あるロットを出荷保留と判定する。
+#
+# 根拠経路: ロット ← 検査結果（inspectedLot）→ 規格（inspectedSpec）
+#   分子 = NG となった検査の件数（分母なし）。閾値は data:rule/R03 の threshold。
+#   測定値（measured_value）と規格上下限（min_value / max_value）は根拠ノード（検査結果・規格）の
+#   属性としてグラフ上に既にあるため、Evidence には evidenceFact でノードへのリンクを張る。
+#
+# 実行前に CLEAR SILENT GRAPH <urn:src:evidence> が必要（src/evidence.py がまとめて行う）。
+# USING は、データが名前付きグラフにあるため必須。
+PREFIX ex:   <http://example.org/kg/ontology#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+INSERT {
+  GRAPH <urn:src:evidence> {
+    ?ev a ex:Evidence ;
+        ex:evidenceSubject ?lot ;
+        ex:evidenceRule    ?rule ;
+        ex:evidenceFact    ?insp , ?spec ;
+        ex:observedValue   ?ngCount ;
+        ex:observedNumerator ?ngCount ;
+        ex:appliedThreshold ?threshold ;
+        ex:conclusion      ?conclusion ;
+        ex:evaluatedAt     ?now .
+  }
+}
+USING <urn:x-arq:UnionGraph>
+WHERE {
+  ?rule ex:rule_id "R03" ; ex:threshold ?threshold ; ex:conclusion ?conclusion .
+
+  # 1. ロットごとの NG 件数
+  {
+    SELECT ?lot (COUNT(DISTINCT ?i) AS ?ngCount)
+    WHERE { ?i ex:inspectedLot ?lot ; ex:result "NG" . }
+    GROUP BY ?lot
+  }
+  FILTER(?ngCount >= ?threshold)
+
+  # 2. NG となった検査とその規格を根拠にする
+  ?insp ex:inspectedLot ?lot ; ex:result "NG" ; ex:inspectedSpec ?spec .
+
+  BIND(NOW() AS ?now)
+  BIND(IRI(CONCAT("http://example.org/kg/data/evidence/R03-",
+                  STRAFTER(STR(?lot), "/lot/"))) AS ?ev)
+}

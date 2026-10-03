@@ -14,22 +14,38 @@ import anthropic
 import pandas as pd
 from dotenv import load_dotenv
 
+import evidence
+import viz
+
 load_dotenv()
 
 ROOT = Path(__file__).resolve().parent.parent
 PROMPTS = ROOT / "prompts"
 MODEL = "claude-sonnet-5-5"
-MAX_TOKENS_EXPLANATION = 500
+# APP_SPEC の 500 は1ルール分。複数ルールを1本にまとめるときは該当ルール数に比例させる
+MAX_TOKENS_PER_JUDGEMENT = 500
 
 PREFIXES = {
     "http://example.org/kg/data/": "data:",
     "http://example.org/kg/ontology#": "ex:",
 }
 
+# 説明文に渡す根拠ノードの属性（判定経路の説明に使うものだけ）。数量・評価・地域などは渡さない。
+# 経路グラフのツールチップには全属性を出す
+EXPLAIN_ATTRS = {
+    "start_date",  # Lot（R02: 経過日数の起点）
+    "started_at",  # Operation
+    "maint_interval_days",  # Equipment（R02 の閾値）
+    "maint_date", "maint_type",  # Maintenance（R02 の最終保全）
+    "measured_value", "result", "inspected_at",  # Inspection（R03）
+    "parameter", "min_value", "max_value", "unit",  # Spec（R03 の規格上下限）
+}
+
 # prompts/evidence_to_text.md の制約（推測・断定回避・提案の禁止）に反する表現
 HEDGES = ["思われ", "可能性", "推測", "考えられ", "おそらく", "かもしれ", "見られ", "恐れ", "推奨", "べき", "対策"]
 
-ID_TOKEN = re.compile(r"[A-Z]{1,3}\d{2,}")
+# 英数字に続かない ID（タイムスタンプ "2026-06-24T15:00" の "T15" を ID と誤認しない）
+ID_TOKEN = re.compile(r"(?<![0-9A-Za-z])[A-Z]{1,3}\d{2,}")
 NUM_TOKEN = re.compile(r"\d+(?:\.\d+)?")
 
 
@@ -54,30 +70,45 @@ def compact(value):
     return value
 
 
-def evidence_payload(detail: pd.DataFrame, edges: pd.DataFrame) -> dict:
-    """evidence_detail.rq / evidence_edges.rq の結果を判定単位の JSON に組み替える（値は無加工）。"""
-    edges = edges.map(compact)
+def evidence_payload(detail: pd.DataFrame, edges: pd.DataFrame, props: pd.DataFrame) -> dict:
+    """evidence_detail / evidence_edges / evidence_node_props の結果を判定単位の JSON に組み替える（値は無加工）。
+
+    判定は結論の重い順（evidence.CONCLUSION_ORDER）に並べる。分子・分母は Rule のラベルと対にして渡し、
+    ラベルに無い意味づけ（「件」への読み替えなど）を Claude にさせない。
+    """
+    edges = edges.drop_duplicates().map(compact)
+    attrs: dict[str, dict] = {}
+    for r in props[props.p.map(lambda p: p.rsplit("#", 1)[-1] in EXPLAIN_ATTRS)].itertuples():
+        attrs.setdefault(compact(r.node), {})[compact(r.p)] = r.o
     judgements = []
-    for ev_iri, group in detail.groupby("evidence", sort=True):
+    for ev_iri in evidence.order_by_conclusion(detail):
+        group = detail[detail.evidence == ev_iri]
         rows = [{k: compact(v) for k, v in r.items()} for r in group.to_dict("records")]
         head = rows[0]
         ev_iri = compact(ev_iri)
         nodes = {r["node"] for r in rows}
+        measures = [
+            {"label": head[f"{part}Label"], "value": head[part]}
+            for part in ("numerator", "denominator")
+            if head[part] is not None
+        ]
         judgements.append({
             "evidence": ev_iri,
             "conclusion": head["conclusion"],
-            "rule": {"id": head["ruleId"], "threshold": head["threshold"]},
-            "observedValue": head["observedValue"],
-            "observedNumerator": head["numerator"],
-            "observedDenominator": head["denominator"],
+            "rule": {"id": head["ruleId"], "name": head["ruleName"], "threshold_unit": head["thresholdUnit"]},
+            # 画面と同じ表記（比率は小数2桁）。説明文と画面の数値を一致させる
+            "observedValue": viz.display_value(head["observedValue"], head["thresholdUnit"]),
+            "measures": measures,
+            "threshold": head["threshold"],
             "evaluatedAt": head["evaluatedAt"],
             "nodes": [
-                {"iri": r["node"], "role": r["role"], "class": r["type"], "name": r["name"]}
+                {"iri": r["node"], "role": r["role"], "class": r["type"], "name": r["name"],
+                 "attributes": attrs.get(r["node"], {})}
                 for r in rows
             ],
             "path": [
                 {"s": e.s, "p": e.p, "o": e.o}
-                for e in edges.drop_duplicates().itertuples()
+                for e in edges.itertuples()
                 if e.s == ev_iri or (e.s in nodes and e.o in nodes)
             ],
         })
@@ -85,13 +116,14 @@ def evidence_payload(detail: pd.DataFrame, edges: pd.DataFrame) -> dict:
 
 
 def explain(payload: dict) -> str:
-    """判定結果 JSON から 3〜4 文の説明文を生成する。"""
+    """判定結果 JSON から、該当した全ルールを1本にまとめた説明文を生成する。"""
+    max_tokens = MAX_TOKENS_PER_JUDGEMENT * max(1, len(payload["judgements"]))
     data = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
     prompt = load_prompt("evidence_to_text.md").replace("{{EVIDENCE_JSON}}", data)
     client = anthropic.Anthropic()
     response = client.beta.messages.create(
         model=MODEL,
-        max_tokens=MAX_TOKENS_EXPLANATION,
+        max_tokens=max_tokens,
         # 根拠 JSON を文章に置き換えるだけの短い変換なので、思考は使わない
         thinking={"type": "between_tools"},
         output_config={"effort": "low"},
@@ -103,7 +135,7 @@ def explain(payload: dict) -> str:
         raise RuntimeError("説明文の生成が拒否されました（stop_reason=refusal）")
     text = "".join(b.text for b in response.content if b.type == "text").strip()
     if response.stop_reason == "max_tokens":
-        raise RuntimeError(f"説明文が max_tokens={MAX_TOKENS_EXPLANATION} で途切れました: {text}")
+        raise RuntimeError(f"説明文が max_tokens={max_tokens} で途切れました: {text}")
     return text
 
 

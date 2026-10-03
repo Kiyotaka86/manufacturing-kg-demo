@@ -23,7 +23,20 @@ LOT_NS = "http://example.org/kg/data/lot/"
 # ルールID → 判定クエリ（queries/ 配下）。他ルールも同じ形で追加する
 RULE_QUERIES = {
     "R01": "evidence_r01_supplier_defect.rq",
+    "R02": "evidence_r02_maint_overdue.rq",
+    "R03": "evidence_r03_inspection_ng.rq",
 }
+
+
+# 結論の重さ（小さいほど重い）。画面・説明文ともこの順に並べる。未知の結論は最後
+CONCLUSION_ORDER = {"出荷保留": 0, "要注意": 1}
+
+
+def order_by_conclusion(detail: pd.DataFrame) -> list[str]:
+    """Evidence IRI を結論の重い順（同じ重さならルールID順）に並べる。"""
+    heads = detail.drop_duplicates("evidence")
+    key = heads.apply(lambda r: (CONCLUSION_ORDER.get(r.conclusion, len(CONCLUSION_ORDER)), r.ruleId), axis=1)
+    return heads.assign(_k=key).sort_values("_k")["evidence"].tolist()
 
 
 def build_request(rule_ids: list[str]) -> str:
@@ -47,6 +60,12 @@ def counts() -> pd.DataFrame:
 def evidence_for(lot_iri: str) -> pd.DataFrame:
     """1 ロットの Evidence と根拠ノード（subject / rule / fact）の一覧。"""
     query = fuseki.bind_values(fuseki.load_query("evidence_detail.rq"), "lot", lot_iri)
+    return fuseki.select(query)
+
+
+def node_props_for(lot_iri: str) -> pd.DataFrame:
+    """根拠ノード（subject / fact）のリテラル属性（列: node, p, o）。測定値・規格上下限・日付など。"""
+    query = fuseki.bind_values(fuseki.load_query("evidence_node_props.rq"), "lot", lot_iri)
     return fuseki.select(query)
 
 

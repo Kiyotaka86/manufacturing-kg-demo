@@ -1,6 +1,6 @@
 """ナレッジグラフ予行練習アプリ。起動: uv run streamlit run src/app.py
 
-現時点の実装範囲（APP_SPEC.md 第7節 1〜5）:
+現時点の実装範囲（APP_SPEC.md 第7節 1〜5、CQ06 は R01〜R03）:
 - サイドバー: Fuseki 接続状態、判定の再生成、表示オプション
 - タブ1: CQ01〜05 はテーブル表示。CQ06 は「判定 → 根拠経路グラフ → 説明文」
 タブ2・3、CQ07〜10、自然文→SPARQL は後続段階で実装する。
@@ -89,25 +89,28 @@ def render_judgement(cq: fuseki.CQ, target: str, show_sparql: bool, explain_on: 
     # 1. 判定（値は Evidence / Rule のトリプルをそのまま表示）
     if detail.empty:
         st.markdown("### 判定: 該当なし")
-        st.caption("urn:src:evidence にこの対象の Evidence がありません（R01 非該当）。")
+        st.caption("urn:src:evidence にこの対象の Evidence がありません（どのルールにも非該当）。")
     else:
-        rule_names = detail[detail.role == "rule"].set_index("node")["name"]
-        for ev in detail.drop_duplicates("evidence").itertuples():
-            st.markdown(f"### 判定: {ev.conclusion}")
-            rule_iri = detail[(detail.evidence == ev.evidence) & (detail.role == "rule")].node.iloc[0]
-            st.markdown(f"{rule_names.get(rule_iri, '')} {viz.observed_text(ev)} — {ev.ruleId}")
+        # 結論の重い順（出荷保留 > 要注意）。最も重い結論を見出しにする
+        order = evidence.order_by_conclusion(detail)
+        heads = detail.drop_duplicates("evidence").set_index("evidence").loc[order].reset_index()
+        st.markdown(f"### 判定: {heads.conclusion.iloc[0]}")
+        for ev in heads.itertuples():
+            st.markdown(f"- **{ev.conclusion}** — {ev.ruleId} {ev.ruleName} {viz.observed_text(ev)}")
 
         # 2. 根拠経路
         st.markdown("#### 根拠経路")
-        edges = evidence.edges_for(sorted(detail.evidence.unique()))
-        html, n_nodes = viz.render(detail, edges)
-        st.iframe(html, height=480)
-        st.caption(f"{n_nodes} ノード。濃青=判定対象 / 水色=根拠事実 / 橙=適用ルール / 紫=結論。エッジはすべて実在トリプル。")
+        props = evidence.node_props_for(target)
+        edges = evidence.edges_for(order)
+        html, n_nodes, n_edges = viz.render(detail, edges, props)
+        st.iframe(html, height=580)
+        st.caption(f"{n_nodes} ノード・{n_edges} エッジ。濃青=判定対象 / 水色=根拠事実 / 橙=適用ルール / 紫=結論。"
+                   "エッジはすべて実在トリプル。ノードにカーソルを合わせると属性値を表示。")
 
         # 3. 説明文
         if explain_on:
             st.markdown("#### 説明")
-            payload = llm.evidence_payload(detail, edges)
+            payload = llm.evidence_payload(detail, edges, props)
             try:
                 text = cached_explanation(json.dumps(payload, ensure_ascii=False, sort_keys=True))
             except (anthropic.APIError, RuntimeError) as e:  # 説明文が無くても判定と経路は成立させる
@@ -120,7 +123,8 @@ def render_judgement(cq: fuseki.CQ, target: str, show_sparql: bool, explain_on: 
                 if not issues:
                     st.caption("自己点検: 根拠外の ID・名前・数値、推測・提案表現は検出されませんでした。")
 
-    st.caption("CQ06 の結果テーブルには R02/R03 の行も含まれますが、Evidence 化済みは R01 のみのため、経路と説明は R01 に限ります。")
+    st.caption("判定・経路・説明は urn:src:evidence の Evidence（R01〜R03）に基づきます。下の結果テーブルは cq06.rq の"
+               "簡易判定で、R02 は日数比較を省略しているため Evidence と一致しない行があります。")
     if show_sparql:
         with st.expander("実行した SPARQL"):
             st.code(query, language="sparql")

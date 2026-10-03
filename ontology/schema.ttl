@@ -174,6 +174,10 @@ ex:rule_name      a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:range xsd:
 ex:description    a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:range xsd:string .
 ex:threshold      a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:comment "数値または文字列。threshold_unit で解釈"@ja .
 ex:threshold_unit a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:range xsd:string .
+ex:numerator_label   a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:range xsd:string ;
+    rdfs:comment "Evidence の observedNumerator が何を数えた値か（比率・日数・件数のルールのみ）"@ja .
+ex:denominator_label a owl:DatatypeProperty ; rdfs:domain ex:Rule ; rdfs:range xsd:string ;
+    rdfs:comment "Evidence の observedDenominator が何を数えた値か（分母を持つルールのみ）"@ja .
 ex:conclusion     a owl:DatatypeProperty ; rdfs:range xsd:string ;
     rdfs:comment "Rule では想定結論、Evidence では実際の結論"@ja .
 ex:observedValue  a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:range xsd:decimal ;
@@ -182,6 +186,8 @@ ex:observedNumerator   a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:r
     rdfs:comment "observedValue の分子（例: 不良ロット数 16）"@ja .
 ex:observedDenominator a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:range xsd:integer ;
     rdfs:comment "observedValue の分母（例: 総ロット数 20）"@ja .
+ex:appliedThreshold    a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:range xsd:decimal ;
+    rdfs:comment "判定に使った閾値。Rule の threshold、または R02 のように対象ごとに決まる値（設備の maint_interval_days）"@ja .
 ex:evaluatedAt    a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:range xsd:dateTime .
 ex:explanation    a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:range xsd:string ;
     rdfs:comment "Claude が生成した自然文の説明（任意）"@ja .
