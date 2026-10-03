@@ -1,0 +1,6381 @@
+{
+ "initial": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [],
+  "dataframe": [],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq01"
+   ],
+   [
+    "対象を選ぶ（?product）",
+    "http://example.org/kg/data/product/P001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq01",
+   "main_tabs": "質問する",
+   "nl_question": ""
+  },
+  "toast": [],
+  "warning": []
+ },
+ "judgement_cq06_L0003": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "14 ノード・22 エッジ。濃青=判定対象 / 水色=根拠事実 / 橙=適用ルール / 紫=結論 / 灰色破線=判定不能。エッジはすべて実在トリプル。ノードにカーソルを合わせると属性値を表示。",
+   "自己点検: 根拠外の ID・名前・数値、推測・提案表現、該当なしへの読み替えは検出されませんでした。",
+   "参照した判定: 確定（rules の閾値）（urn:src:evidence）",
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ06: ロットLは「要注意」か。判定理由を経路で示せ (R01, R02, R03)\n# path: lot <- Evidence（urn:src:evidence）-> rule / 根拠事実\n#\n# 判定は queries/evidence_r0*.rq が urn:src:evidence に書き戻した ex:Evidence をそのまま読む。\n# アプリの判定・根拠経路・説明文も同じ Evidence を元にするため、結果テーブルと画面の判定は常に一致する。\n# 1 行 = 1 Evidence（該当ルール）。行が無ければどのルールにも該当しない。\n# 判定不能（R02 で保全記録が無いなど）は conclusion「判定不能」と undeterminedReason で返す。\n# 結論の重い順（出荷保留 > 要注意 > 判定不能）の並べ替えはアプリ層で行う。\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator\n       ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\n       (GROUP_CONCAT(DISTINCT STR(?fact); separator=\" \") AS ?facts)\nWHERE {\n    VALUES ?lot { <http://example.org/kg/data/lot/L0003> }  # 対象ロットはアプリ層で差し替える\n    GRAPH <urn:src:evidence> {\n        ?evidence ex:evidenceSubject ?lot ;\n                  ex:evidenceRule ?rule ;\n                  ex:conclusion ?conclusion ;\n                  ex:appliedThreshold ?threshold ;\n                  ex:evidenceFact ?fact .\n        OPTIONAL { ?evidence ex:observedValue ?observedValue . }\n        OPTIONAL { ?evidence ex:observedNumerator ?numerator . }\n        OPTIONAL { ?evidence ex:observedDenominator ?denominator . }\n        OPTIONAL { ?evidence ex:undeterminedReason ?undeterminedReason . }\n    }\n    ?rule ex:rule_id ?ruleId ; ex:rule_name ?ruleName .\n    OPTIONAL { ?rule ex:comparison ?comparison . }\n    OPTIONAL { ?rule ex:threshold_unit ?thresholdUnit . }\n}\nGROUP BY ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator\n         ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\nORDER BY ?ruleId"
+  ],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "denominator": "20",
+     "evidence": "data:evidence/R01-L0003",
+     "facts": "data:supplier/S005 http://example.org/kg/data/purchase/PU018 http://example.org/kg/data/partConsumption/LP003",
+     "lot": "data:lot/L0003",
+     "numerator": "16",
+     "observedValue": "0.8",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio",
+     "undeterminedReason": "nan"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "判定不能",
+     "denominator": "nan",
+     "evidence": "data:evidence/R02-L0003",
+     "facts": "data:operation/OP003 http://example.org/kg/data/equipment/E003",
+     "lot": "data:lot/L0003",
+     "numerator": "nan",
+     "observedValue": "nan",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "30",
+     "thresholdUnit": "days(equipment)",
+     "undeterminedReason": "ロット開始日以前の保全記録なし"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "denominator": "nan",
+     "evidence": "data:evidence/R03-L0003",
+     "facts": "data:inspection/I003 http://example.org/kg/data/spec/SP018",
+     "lot": "data:lot/L0003",
+     "numerator": "1",
+     "observedValue": "1",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count",
+     "undeterminedReason": "nan"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "実行した SPARQL",
+   "結果テーブル（全列・3 件）"
+  ],
+  "info": [],
+  "markdown": [
+   "### 判定: 出荷保留",
+   "- **出荷保留** — R03 検査NG　1 件（閾値 1 件）",
+   "- **要注意** — R01 サプライヤー不良率　16 / 20 = 0.80（閾値 0.05）",
+   "- **判定不能** — R02 保全間隔超過　判定不能（ロット開始日以前の保全記録なし）",
+   "#### 根拠経路",
+   "#### 説明",
+   "スタブ説明: 判断ルールR03（検査NG）=出荷保留、判断ルールR01（サプライヤー不良率）=要注意、判断ルールR02（保全間隔超過）=判定不能",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq06"
+   ],
+   [
+    "対象を選ぶ（?lot）",
+    "http://example.org/kg/data/lot/L0003"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq06",
+   "last_run": [
+    "cq06",
+    "http://example.org/kg/data/lot/L0003"
+   ],
+   "main_tabs": "質問する",
+   "nl_question": "",
+   "target_cq06": "http://example.org/kg/data/lot/L0003"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "judgement_cq06_L0048": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "15 ノード・24 エッジ。濃青=判定対象 / 水色=根拠事実 / 橙=適用ルール / 紫=結論 / 灰色破線=判定不能。エッジはすべて実在トリプル。ノードにカーソルを合わせると属性値を表示。",
+   "自己点検: 根拠外の ID・名前・数値、推測・提案表現、該当なしへの読み替えは検出されませんでした。",
+   "参照した判定: 確定（rules の閾値）（urn:src:evidence）",
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ06: ロットLは「要注意」か。判定理由を経路で示せ (R01, R02, R03)\n# path: lot <- Evidence（urn:src:evidence）-> rule / 根拠事実\n#\n# 判定は queries/evidence_r0*.rq が urn:src:evidence に書き戻した ex:Evidence をそのまま読む。\n# アプリの判定・根拠経路・説明文も同じ Evidence を元にするため、結果テーブルと画面の判定は常に一致する。\n# 1 行 = 1 Evidence（該当ルール）。行が無ければどのルールにも該当しない。\n# 判定不能（R02 で保全記録が無いなど）は conclusion「判定不能」と undeterminedReason で返す。\n# 結論の重い順（出荷保留 > 要注意 > 判定不能）の並べ替えはアプリ層で行う。\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator\n       ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\n       (GROUP_CONCAT(DISTINCT STR(?fact); separator=\" \") AS ?facts)\nWHERE {\n    VALUES ?lot { <http://example.org/kg/data/lot/L0048> }  # 対象ロットはアプリ層で差し替える\n    GRAPH <urn:src:evidence> {\n        ?evidence ex:evidenceSubject ?lot ;\n                  ex:evidenceRule ?rule ;\n                  ex:conclusion ?conclusion ;\n                  ex:appliedThreshold ?threshold ;\n                  ex:evidenceFact ?fact .\n        OPTIONAL { ?evidence ex:observedValue ?observedValue . }\n        OPTIONAL { ?evidence ex:observedNumerator ?numerator . }\n        OPTIONAL { ?evidence ex:observedDenominator ?denominator . }\n        OPTIONAL { ?evidence ex:undeterminedReason ?undeterminedReason . }\n    }\n    ?rule ex:rule_id ?ruleId ; ex:rule_name ?ruleName .\n    OPTIONAL { ?rule ex:comparison ?comparison . }\n    OPTIONAL { ?rule ex:threshold_unit ?thresholdUnit . }\n}\nGROUP BY ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator\n         ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\nORDER BY ?ruleId"
+  ],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "denominator": "11",
+     "evidence": "data:evidence/R01-L0048",
+     "facts": "data:supplier/S002 http://example.org/kg/data/purchase/PU017 http://example.org/kg/data/partConsumption/LP048",
+     "lot": "data:lot/L0048",
+     "numerator": "2",
+     "observedValue": "0.181818181818181818181818",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio",
+     "undeterminedReason": "None"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "denominator": "30",
+     "evidence": "data:evidence/R02-L0048",
+     "facts": "data:equipment/E003 http://example.org/kg/data/operation/OP048 http://example.org/kg/data/maintenance/M008",
+     "lot": "data:lot/L0048",
+     "numerator": "33",
+     "observedValue": "33",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "30",
+     "thresholdUnit": "days(equipment)",
+     "undeterminedReason": "None"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "denominator": "nan",
+     "evidence": "data:evidence/R03-L0048",
+     "facts": "data:spec/SP017 http://example.org/kg/data/inspection/I048",
+     "lot": "data:lot/L0048",
+     "numerator": "1",
+     "observedValue": "1",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count",
+     "undeterminedReason": "None"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "実行した SPARQL",
+   "結果テーブル（全列・3 件）"
+  ],
+  "info": [],
+  "markdown": [
+   "### 判定: 出荷保留",
+   "- **出荷保留** — R03 検査NG　1 件（閾値 1 件）",
+   "- **要注意** — R01 サプライヤー不良率　2 / 11 = 0.18（閾値 0.05）",
+   "- **要注意** — R02 保全間隔超過　33 日（閾値 30 日）",
+   "#### 根拠経路",
+   "#### 説明",
+   "スタブ説明: 判断ルールR03（検査NG）=出荷保留、判断ルールR01（サプライヤー不良率）=要注意、判断ルールR02（保全間隔超過）=要注意",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq06"
+   ],
+   [
+    "対象を選ぶ（?lot）",
+    "http://example.org/kg/data/lot/L0048"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq06",
+   "last_run": [
+    "cq06",
+    "http://example.org/kg/data/lot/L0048"
+   ],
+   "main_tabs": "質問する",
+   "nl_question": "",
+   "target_cq06": "http://example.org/kg/data/lot/L0048"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "judgement_cq08_PT013": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "この部品の現行サプライヤーが R04 に該当しないか、R05 を満たす代替がありません。",
+   "参照した判定: 確定（rules の閾値）（urn:src:evidence）",
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ08: サプライヤーSの代替候補は？根拠付き (R04: 低評価サプライヤー, R05: 代替サプライヤー条件)\n# path: 現行サプライヤー <- 部品 -> 規格 <- 代替部品 -> 代替サプライヤー\n#\n# 判定は queries/evidence_r05_alternative.rq が urn:src:evidence に書き戻した ex:Evidence をそのまま読む。\n# 対象は部品（R04 に該当するサプライヤーが供給する部品）。1 行 = 1 代替候補（代替部品 × 代替サプライヤー）。\n# 行が無ければ、その部品は R04 非該当か、R05 を満たす代替が無い。\n# 推奨の強さ（順位）は付けない。並びは代替部品・代替サプライヤーの ID 順。\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?part ?ruleId ?ruleName ?conclusion ?curSupplier ?spec ?altPart ?altSupplier\n       ?observedValue ?numerator ?denominator ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\nWHERE {\n    VALUES ?part { <http://example.org/kg/data/part/PT013> }  # 対象部品はアプリ層で差し替える\n    GRAPH <urn:src:evidence> {\n        ?evidence ex:evidenceSubject ?part ;\n                  ex:evidenceRule ?rule ;\n                  ex:conclusion ?conclusion ;\n                  ex:appliedThreshold ?threshold ;\n                  ex:alternativePart ?altPart ;\n                  ex:alternativeSupplier ?altSupplier ;\n                  ex:evidenceFact ?curSupplier , ?spec .\n        OPTIONAL { ?evidence ex:observedValue ?observedValue . }\n        OPTIONAL { ?evidence ex:observedNumerator ?numerator . }\n        OPTIONAL { ?evidence ex:observedDenominator ?denominator . }\n        OPTIONAL { ?evidence ex:undeterminedReason ?undeterminedReason . }\n    }\n    ?curSupplier a ex:Supplier . FILTER(?curSupplier != ?altSupplier)\n    ?spec a ex:Spec .\n    ?rule ex:rule_id ?ruleId ; ex:rule_name ?ruleName .\n    OPTIONAL { ?rule ex:comparison ?comparison . }\n    OPTIONAL { ?rule ex:threshold_unit ?thresholdUnit . }\n}\nORDER BY ?altPart ?altSupplier"
+  ],
+  "dataframe": [
+   []
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "実行した SPARQL",
+   "結果テーブル（全列・0 件）"
+  ],
+  "info": [],
+  "markdown": [
+   "### 判定: 代替候補なし",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq08"
+   ],
+   [
+    "対象を選ぶ（?part）",
+    "http://example.org/kg/data/part/PT013"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq08",
+   "last_run": [
+    "cq08",
+    "http://example.org/kg/data/part/PT013"
+   ],
+   "main_tabs": "質問する",
+   "nl_question": "",
+   "target_cq08": "http://example.org/kg/data/part/PT013"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "judgement_cq08_PT014": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "6 ノード・9 エッジ。濃青=判定対象 / 水色=根拠事実 / 橙=適用ルール / 紫=結論 / 灰色破線=判定不能。エッジはすべて実在トリプル。ノードにカーソルを合わせると属性値を表示。",
+   "自己点検: 根拠外の ID・名前・数値、推測・提案表現、該当なしへの読み替えは検出されませんでした。",
+   "参照した判定: 確定（rules の閾値）（urn:src:evidence）",
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ08: サプライヤーSの代替候補は？根拠付き (R04: 低評価サプライヤー, R05: 代替サプライヤー条件)\n# path: 現行サプライヤー <- 部品 -> 規格 <- 代替部品 -> 代替サプライヤー\n#\n# 判定は queries/evidence_r05_alternative.rq が urn:src:evidence に書き戻した ex:Evidence をそのまま読む。\n# 対象は部品（R04 に該当するサプライヤーが供給する部品）。1 行 = 1 代替候補（代替部品 × 代替サプライヤー）。\n# 行が無ければ、その部品は R04 非該当か、R05 を満たす代替が無い。\n# 推奨の強さ（順位）は付けない。並びは代替部品・代替サプライヤーの ID 順。\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?part ?ruleId ?ruleName ?conclusion ?curSupplier ?spec ?altPart ?altSupplier\n       ?observedValue ?numerator ?denominator ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\nWHERE {\n    VALUES ?part { <http://example.org/kg/data/part/PT014> }  # 対象部品はアプリ層で差し替える\n    GRAPH <urn:src:evidence> {\n        ?evidence ex:evidenceSubject ?part ;\n                  ex:evidenceRule ?rule ;\n                  ex:conclusion ?conclusion ;\n                  ex:appliedThreshold ?threshold ;\n                  ex:alternativePart ?altPart ;\n                  ex:alternativeSupplier ?altSupplier ;\n                  ex:evidenceFact ?curSupplier , ?spec .\n        OPTIONAL { ?evidence ex:observedValue ?observedValue . }\n        OPTIONAL { ?evidence ex:observedNumerator ?numerator . }\n        OPTIONAL { ?evidence ex:observedDenominator ?denominator . }\n        OPTIONAL { ?evidence ex:undeterminedReason ?undeterminedReason . }\n    }\n    ?curSupplier a ex:Supplier . FILTER(?curSupplier != ?altSupplier)\n    ?spec a ex:Spec .\n    ?rule ex:rule_id ?ruleId ; ex:rule_name ?ruleName .\n    OPTIONAL { ?rule ex:comparison ?comparison . }\n    OPTIONAL { ?rule ex:threshold_unit ?thresholdUnit . }\n}\nORDER BY ?altPart ?altSupplier"
+  ],
+  "dataframe": [
+   [
+    {
+     "altPart": "data:part/PT014",
+     "altSupplier": "data:supplier/S006",
+     "comparison": "le",
+     "conclusion": "代替候補",
+     "curSupplier": "data:supplier/S005",
+     "denominator": "7",
+     "evidence": "data:evidence/R05-PT014-PT014-S006",
+     "numerator": "0",
+     "observedValue": "0.0",
+     "part": "data:part/PT014",
+     "ruleId": "R05",
+     "ruleName": "代替サプライヤー条件",
+     "spec": "data:spec/SP014",
+     "threshold": "0.03",
+     "thresholdUnit": "ratio",
+     "undeterminedReason": "None"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "実行した SPARQL",
+   "結果テーブル（全列・1 件）"
+  ],
+  "info": [],
+  "markdown": [
+   "### 判定: 代替候補",
+   "- **代替候補** — R05 代替サプライヤー条件　PT014 センサー 14 S006 ハヤシ製作所　0 / 7 = 0.00（閾値 0.03）",
+   "#### 根拠経路",
+   "#### 説明",
+   "スタブ説明: 判断ルールR05（代替サプライヤー条件）=代替候補",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq08"
+   ],
+   [
+    "対象を選ぶ（?part）",
+    "http://example.org/kg/data/part/PT014"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq08",
+   "last_run": [
+    "cq08",
+    "http://example.org/kg/data/part/PT014"
+   ],
+   "main_tabs": "質問する",
+   "nl_question": "",
+   "target_cq08": "http://example.org/kg/data/part/PT014"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "nl_fail_1": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "承認して実行",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "SELECT ?s WHERE { ?s a <urn:test:nothing> }"
+  ],
+  "dataframe": [],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "#### 自由入力（自然文 → SPARQL）",
+   "生成された SPARQL（2 回目）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq01"
+   ],
+   [
+    "対象を選ぶ（?product）",
+    "http://example.org/kg/data/product/P001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq01",
+   "main_tabs": "質問する",
+   "nl": {
+    "attempt": 2,
+    "df": null,
+    "errors": [
+     "HTTP 400: Parse error: Lexical error at line 1, column 24.  Encountered: <EOF> after prefix \"BROKEN\"\n"
+    ],
+    "q": "fail",
+    "sparql": "SELECT ?s WHERE { ?s a <urn:test:nothing> }",
+    "status": "pending"
+   },
+   "nl_question": "fail"
+  },
+  "toast": [],
+  "warning": [
+   "1回目のクエリは失敗しました（HTTP 400: Parse error: Lexical error at line 1, column 24.  Encountered: <EOF> after prefix \"BROKEN\"\n）。再生成したクエリを確認してください。"
+  ]
+ },
+ "nl_fail_2": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "SELECT ?s WHERE { ?s a <urn:test:nothing> }"
+  ],
+  "dataframe": [],
+  "error": [
+   "2回とも失敗しました（結果が 0 件でした）。上の CQ から近い質問を選んでください。"
+  ],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "#### 自由入力（自然文 → SPARQL）",
+   "生成された SPARQL（2 回目）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq01"
+   ],
+   [
+    "対象を選ぶ（?product）",
+    "http://example.org/kg/data/product/P001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq01",
+   "main_tabs": "質問する",
+   "nl": {
+    "attempt": 2,
+    "df": [],
+    "errors": [
+     "HTTP 400: Parse error: Lexical error at line 1, column 24.  Encountered: <EOF> after prefix \"BROKEN\"\n",
+     "結果が 0 件でした"
+    ],
+    "q": "fail",
+    "sparql": "SELECT ?s WHERE { ?s a <urn:test:nothing> }",
+    "status": "failed"
+   },
+   "nl_question": "fail"
+  },
+  "toast": [],
+  "warning": [
+   "1回目のクエリは失敗しました（HTTP 400: Parse error: Lexical error at line 1, column 24.  Encountered: <EOF> after prefix \"BROKEN\"\n）。再生成したクエリを確認してください。"
+  ]
+ },
+ "nl_fail_changed": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [],
+  "dataframe": [],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq01"
+   ],
+   [
+    "対象を選ぶ（?product）",
+    "http://example.org/kg/data/product/P001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq01",
+   "main_tabs": "質問する",
+   "nl": null,
+   "nl_question": "ok"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "nl_fail_generated": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "承認して実行",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "SELECT * WHERE { BROKEN"
+  ],
+  "dataframe": [],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "#### 自由入力（自然文 → SPARQL）",
+   "生成された SPARQL（1 回目）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq01"
+   ],
+   [
+    "対象を選ぶ（?product）",
+    "http://example.org/kg/data/product/P001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq01",
+   "main_tabs": "質問する",
+   "nl": {
+    "attempt": 1,
+    "df": null,
+    "errors": [],
+    "q": "fail",
+    "sparql": "SELECT * WHERE { BROKEN",
+    "status": "pending"
+   },
+   "nl_question": "fail"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "nl_ok_1": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ01: 製品Xを構成する部品と、各部品のサプライヤーは？\n# path: product -> bom -> part -> purchase -> supplier\n# tdb2:unionDefaultGraph=true のため、GRAPH句なしで全名前付きグラフを横断できる\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?part ?partName ?supplier ?supplierName WHERE {\n    VALUES ?product { <http://example.org/kg/data/product/P001> }  # 対象製品はアプリ層で差し替える\n    ?bom ex:bomProduct ?product ; ex:bomPart ?part .\n    ?part ex:part_name ?partName .\n    OPTIONAL {\n        ?purchase ex:purchasedPart ?part ; ex:purchasedFrom ?supplier .\n        ?supplier ex:supplier_name ?supplierName .\n    }\n}\nORDER BY ?part ?supplier"
+  ],
+  "dataframe": [
+   [
+    {
+     "part": "data:part/PT001",
+     "partName": "ベアリング 01",
+     "supplier": "data:supplier/S001",
+     "supplierName": "東和精機"
+    },
+    {
+     "part": "data:part/PT001",
+     "partName": "ベアリング 01",
+     "supplier": "data:supplier/S008",
+     "supplierName": "アオバ樹脂"
+    },
+    {
+     "part": "data:part/PT002",
+     "partName": "シール 02",
+     "supplier": "data:supplier/S005",
+     "supplierName": "ミナト金属"
+    },
+    {
+     "part": "data:part/PT002",
+     "partName": "シール 02",
+     "supplier": "data:supplier/S009",
+     "supplierName": "共栄センサー"
+    },
+    {
+     "part": "data:part/PT003",
+     "partName": "基板 03",
+     "supplier": "data:supplier/S003",
+     "supplierName": "サンエイ電子"
+    },
+    {
+     "part": "data:part/PT003",
+     "partName": "基板 03",
+     "supplier": "data:supplier/S010",
+     "supplierName": "ナガイ電線"
+    },
+    {
+     "part": "data:part/PT004",
+     "partName": "ハウジング 04",
+     "supplier": "data:supplier/S004",
+     "supplierName": "大成シール工業"
+    },
+    {
+     "part": "data:part/PT004",
+     "partName": "ハウジング 04",
+     "supplier": "data:supplier/S011",
+     "supplierName": "SEA Components"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "#### 自由入力（自然文 → SPARQL）",
+   "生成された SPARQL（1 回目）",
+   "**8 件**",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq01"
+   ],
+   [
+    "対象を選ぶ（?product）",
+    "http://example.org/kg/data/product/P001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq01",
+   "main_tabs": "質問する",
+   "nl": {
+    "attempt": 1,
+    "df": [
+     {
+      "part": "http://example.org/kg/data/part/PT001",
+      "partName": "ベアリング 01",
+      "supplier": "http://example.org/kg/data/supplier/S001",
+      "supplierName": "東和精機"
+     },
+     {
+      "part": "http://example.org/kg/data/part/PT001",
+      "partName": "ベアリング 01",
+      "supplier": "http://example.org/kg/data/supplier/S008",
+      "supplierName": "アオバ樹脂"
+     },
+     {
+      "part": "http://example.org/kg/data/part/PT002",
+      "partName": "シール 02",
+      "supplier": "http://example.org/kg/data/supplier/S005",
+      "supplierName": "ミナト金属"
+     },
+     {
+      "part": "http://example.org/kg/data/part/PT002",
+      "partName": "シール 02",
+      "supplier": "http://example.org/kg/data/supplier/S009",
+      "supplierName": "共栄センサー"
+     },
+     {
+      "part": "http://example.org/kg/data/part/PT003",
+      "partName": "基板 03",
+      "supplier": "http://example.org/kg/data/supplier/S003",
+      "supplierName": "サンエイ電子"
+     },
+     {
+      "part": "http://example.org/kg/data/part/PT003",
+      "partName": "基板 03",
+      "supplier": "http://example.org/kg/data/supplier/S010",
+      "supplierName": "ナガイ電線"
+     },
+     {
+      "part": "http://example.org/kg/data/part/PT004",
+      "partName": "ハウジング 04",
+      "supplier": "http://example.org/kg/data/supplier/S004",
+      "supplierName": "大成シール工業"
+     },
+     {
+      "part": "http://example.org/kg/data/part/PT004",
+      "partName": "ハウジング 04",
+      "supplier": "http://example.org/kg/data/supplier/S011",
+      "supplierName": "SEA Components"
+     }
+    ],
+    "errors": [],
+    "q": "ok",
+    "sparql": "# CQ01: 製品Xを構成する部品と、各部品のサプライヤーは？\n# path: product -> bom -> part -> purchase -> supplier\n# tdb2:unionDefaultGraph=true のため、GRAPH句なしで全名前付きグラフを横断できる\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?part ?partName ?supplier ?supplierName WHERE {\n    VALUES ?product { <http://example.org/kg/data/product/P001> }  # 対象製品はアプリ層で差し替える\n    ?bom ex:bomProduct ?product ; ex:bomPart ?part .\n    ?part ex:part_name ?partName .\n    OPTIONAL {\n        ?purchase ex:purchasedPart ?part ; ex:purchasedFrom ?supplier .\n        ?supplier ex:supplier_name ?supplierName .\n    }\n}\nORDER BY ?part ?supplier\n",
+    "status": "done"
+   },
+   "nl_question": "ok"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "nl_ok_changed": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ01: 製品Xを構成する部品と、各部品のサプライヤーは？\n# path: product -> bom -> part -> purchase -> supplier\n# tdb2:unionDefaultGraph=true のため、GRAPH句なしで全名前付きグラフを横断できる\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?part ?partName ?supplier ?supplierName WHERE {\n    VALUES ?product { <http://example.org/kg/data/product/P001> }  # 対象製品はアプリ層で差し替える\n    ?bom ex:bomProduct ?product ; ex:bomPart ?part .\n    ?part ex:part_name ?partName .\n    OPTIONAL {\n        ?purchase ex:purchasedPart ?part ; ex:purchasedFrom ?supplier .\n        ?supplier ex:supplier_name ?supplierName .\n    }\n}\nORDER BY ?part ?supplier"
+  ],
+  "dataframe": [
+   [
+    {
+     "part": "data:part/PT001",
+     "partName": "ベアリング 01",
+     "supplier": "data:supplier/S001",
+     "supplierName": "東和精機"
+    },
+    {
+     "part": "data:part/PT001",
+     "partName": "ベアリング 01",
+     "supplier": "data:supplier/S008",
+     "supplierName": "アオバ樹脂"
+    },
+    {
+     "part": "data:part/PT002",
+     "partName": "シール 02",
+     "supplier": "data:supplier/S005",
+     "supplierName": "ミナト金属"
+    },
+    {
+     "part": "data:part/PT002",
+     "partName": "シール 02",
+     "supplier": "data:supplier/S009",
+     "supplierName": "共栄センサー"
+    },
+    {
+     "part": "data:part/PT003",
+     "partName": "基板 03",
+     "supplier": "data:supplier/S003",
+     "supplierName": "サンエイ電子"
+    },
+    {
+     "part": "data:part/PT003",
+     "partName": "基板 03",
+     "supplier": "data:supplier/S010",
+     "supplierName": "ナガイ電線"
+    },
+    {
+     "part": "data:part/PT004",
+     "partName": "ハウジング 04",
+     "supplier": "data:supplier/S004",
+     "supplierName": "大成シール工業"
+    },
+    {
+     "part": "data:part/PT004",
+     "partName": "ハウジング 04",
+     "supplier": "data:supplier/S011",
+     "supplierName": "SEA Components"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "#### 自由入力（自然文 → SPARQL）",
+   "生成された SPARQL（1 回目）",
+   "**8 件**",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq01"
+   ],
+   [
+    "対象を選ぶ（?product）",
+    "http://example.org/kg/data/product/P001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq01",
+   "main_tabs": "質問する",
+   "nl": {
+    "attempt": 1,
+    "df": [
+     {
+      "part": "http://example.org/kg/data/part/PT001",
+      "partName": "ベアリング 01",
+      "supplier": "http://example.org/kg/data/supplier/S001",
+      "supplierName": "東和精機"
+     },
+     {
+      "part": "http://example.org/kg/data/part/PT001",
+      "partName": "ベアリング 01",
+      "supplier": "http://example.org/kg/data/supplier/S008",
+      "supplierName": "アオバ樹脂"
+     },
+     {
+      "part": "http://example.org/kg/data/part/PT002",
+      "partName": "シール 02",
+      "supplier": "http://example.org/kg/data/supplier/S005",
+      "supplierName": "ミナト金属"
+     },
+     {
+      "part": "http://example.org/kg/data/part/PT002",
+      "partName": "シール 02",
+      "supplier": "http://example.org/kg/data/supplier/S009",
+      "supplierName": "共栄センサー"
+     },
+     {
+      "part": "http://example.org/kg/data/part/PT003",
+      "partName": "基板 03",
+      "supplier": "http://example.org/kg/data/supplier/S003",
+      "supplierName": "サンエイ電子"
+     },
+     {
+      "part": "http://example.org/kg/data/part/PT003",
+      "partName": "基板 03",
+      "supplier": "http://example.org/kg/data/supplier/S010",
+      "supplierName": "ナガイ電線"
+     },
+     {
+      "part": "http://example.org/kg/data/part/PT004",
+      "partName": "ハウジング 04",
+      "supplier": "http://example.org/kg/data/supplier/S004",
+      "supplierName": "大成シール工業"
+     },
+     {
+      "part": "http://example.org/kg/data/part/PT004",
+      "partName": "ハウジング 04",
+      "supplier": "http://example.org/kg/data/supplier/S011",
+      "supplierName": "SEA Components"
+     }
+    ],
+    "errors": [],
+    "q": "ok",
+    "sparql": "# CQ01: 製品Xを構成する部品と、各部品のサプライヤーは？\n# path: product -> bom -> part -> purchase -> supplier\n# tdb2:unionDefaultGraph=true のため、GRAPH句なしで全名前付きグラフを横断できる\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?part ?partName ?supplier ?supplierName WHERE {\n    VALUES ?product { <http://example.org/kg/data/product/P001> }  # 対象製品はアプリ層で差し替える\n    ?bom ex:bomProduct ?product ; ex:bomPart ?part .\n    ?part ex:part_name ?partName .\n    OPTIONAL {\n        ?purchase ex:purchasedPart ?part ; ex:purchasedFrom ?supplier .\n        ?supplier ex:supplier_name ?supplierName .\n    }\n}\nORDER BY ?part ?supplier\n",
+    "status": "done"
+   },
+   "nl_question": "ok"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "nl_ok_generated": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "承認して実行",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ01: 製品Xを構成する部品と、各部品のサプライヤーは？\n# path: product -> bom -> part -> purchase -> supplier\n# tdb2:unionDefaultGraph=true のため、GRAPH句なしで全名前付きグラフを横断できる\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?part ?partName ?supplier ?supplierName WHERE {\n    VALUES ?product { <http://example.org/kg/data/product/P001> }  # 対象製品はアプリ層で差し替える\n    ?bom ex:bomProduct ?product ; ex:bomPart ?part .\n    ?part ex:part_name ?partName .\n    OPTIONAL {\n        ?purchase ex:purchasedPart ?part ; ex:purchasedFrom ?supplier .\n        ?supplier ex:supplier_name ?supplierName .\n    }\n}\nORDER BY ?part ?supplier"
+  ],
+  "dataframe": [],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "#### 自由入力（自然文 → SPARQL）",
+   "生成された SPARQL（1 回目）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq01"
+   ],
+   [
+    "対象を選ぶ（?product）",
+    "http://example.org/kg/data/product/P001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq01",
+   "main_tabs": "質問する",
+   "nl": {
+    "attempt": 1,
+    "df": null,
+    "errors": [],
+    "q": "ok",
+    "sparql": "# CQ01: 製品Xを構成する部品と、各部品のサプライヤーは？\n# path: product -> bom -> part -> purchase -> supplier\n# tdb2:unionDefaultGraph=true のため、GRAPH句なしで全名前付きグラフを横断できる\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?part ?partName ?supplier ?supplierName WHERE {\n    VALUES ?product { <http://example.org/kg/data/product/P001> }  # 対象製品はアプリ層で差し替える\n    ?bom ex:bomProduct ?product ; ex:bomPart ?part .\n    ?part ex:part_name ?partName .\n    OPTIONAL {\n        ?purchase ex:purchasedPart ?part ; ex:purchasedFrom ?supplier .\n        ?supplier ex:supplier_name ?supplierName .\n    }\n}\nORDER BY ?part ?supplier\n",
+    "status": "pending"
+   },
+   "nl_question": "ok"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "nl_retry-ok_1": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "承認して実行",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ02: 顧客Zのクレームは、どのロット・工程・部品・サプライヤーに遡れるか？\n# path: defect -> lot -> lot_operations / lot_parts -> purchase -> supplier\n# lotUsesSupplier / lotMadeOn は queries/materialize_*.rq で urn:derived:chains に\n# 実体化済みの propertyChainAxiom ショートカット（src/load.py が投入時に実行する）\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?defect ?lot ?equipment ?supplier WHERE {\n    VALUES ?customer { <http://example.org/kg/data/customer/C001> }  # 対象顧客はアプリ層で差し替える\n    ?defect ex:defectCustomer ?customer ; ex:defectLot ?lot .\n    OPTIONAL { ?lot ex:lotMadeOn ?equipment . }\n    OPTIONAL { ?lot ex:lotUsesSupplier ?supplier . }\n}\nORDER BY ?defect"
+  ],
+  "dataframe": [],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "#### 自由入力（自然文 → SPARQL）",
+   "生成された SPARQL（2 回目）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq01"
+   ],
+   [
+    "対象を選ぶ（?product）",
+    "http://example.org/kg/data/product/P001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq01",
+   "main_tabs": "質問する",
+   "nl": {
+    "attempt": 2,
+    "df": null,
+    "errors": [
+     "HTTP 400: Parse error: Lexical error at line 1, column 24.  Encountered: <EOF> after prefix \"BROKEN\"\n"
+    ],
+    "q": "retry-ok",
+    "sparql": "# CQ02: 顧客Zのクレームは、どのロット・工程・部品・サプライヤーに遡れるか？\n# path: defect -> lot -> lot_operations / lot_parts -> purchase -> supplier\n# lotUsesSupplier / lotMadeOn は queries/materialize_*.rq で urn:derived:chains に\n# 実体化済みの propertyChainAxiom ショートカット（src/load.py が投入時に実行する）\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?defect ?lot ?equipment ?supplier WHERE {\n    VALUES ?customer { <http://example.org/kg/data/customer/C001> }  # 対象顧客はアプリ層で差し替える\n    ?defect ex:defectCustomer ?customer ; ex:defectLot ?lot .\n    OPTIONAL { ?lot ex:lotMadeOn ?equipment . }\n    OPTIONAL { ?lot ex:lotUsesSupplier ?supplier . }\n}\nORDER BY ?defect\n",
+    "status": "pending"
+   },
+   "nl_question": "retry-ok"
+  },
+  "toast": [],
+  "warning": [
+   "1回目のクエリは失敗しました（HTTP 400: Parse error: Lexical error at line 1, column 24.  Encountered: <EOF> after prefix \"BROKEN\"\n）。再生成したクエリを確認してください。"
+  ]
+ },
+ "nl_retry-ok_2": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ02: 顧客Zのクレームは、どのロット・工程・部品・サプライヤーに遡れるか？\n# path: defect -> lot -> lot_operations / lot_parts -> purchase -> supplier\n# lotUsesSupplier / lotMadeOn は queries/materialize_*.rq で urn:derived:chains に\n# 実体化済みの propertyChainAxiom ショートカット（src/load.py が投入時に実行する）\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?defect ?lot ?equipment ?supplier WHERE {\n    VALUES ?customer { <http://example.org/kg/data/customer/C001> }  # 対象顧客はアプリ層で差し替える\n    ?defect ex:defectCustomer ?customer ; ex:defectLot ?lot .\n    OPTIONAL { ?lot ex:lotMadeOn ?equipment . }\n    OPTIONAL { ?lot ex:lotUsesSupplier ?supplier . }\n}\nORDER BY ?defect"
+  ],
+  "dataframe": [
+   [
+    {
+     "defect": "data:defect/D001",
+     "equipment": "data:equipment/E001",
+     "lot": "data:lot/L0001",
+     "supplier": "data:supplier/S005"
+    },
+    {
+     "defect": "data:defect/D016",
+     "equipment": "data:equipment/E003",
+     "lot": "data:lot/L0048",
+     "supplier": "data:supplier/S002"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "#### 自由入力（自然文 → SPARQL）",
+   "生成された SPARQL（2 回目）",
+   "**2 件**",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq01"
+   ],
+   [
+    "対象を選ぶ（?product）",
+    "http://example.org/kg/data/product/P001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq01",
+   "main_tabs": "質問する",
+   "nl": {
+    "attempt": 2,
+    "df": [
+     {
+      "defect": "http://example.org/kg/data/defect/D001",
+      "equipment": "http://example.org/kg/data/equipment/E001",
+      "lot": "http://example.org/kg/data/lot/L0001",
+      "supplier": "http://example.org/kg/data/supplier/S005"
+     },
+     {
+      "defect": "http://example.org/kg/data/defect/D016",
+      "equipment": "http://example.org/kg/data/equipment/E003",
+      "lot": "http://example.org/kg/data/lot/L0048",
+      "supplier": "http://example.org/kg/data/supplier/S002"
+     }
+    ],
+    "errors": [
+     "HTTP 400: Parse error: Lexical error at line 1, column 24.  Encountered: <EOF> after prefix \"BROKEN\"\n"
+    ],
+    "q": "retry-ok",
+    "sparql": "# CQ02: 顧客Zのクレームは、どのロット・工程・部品・サプライヤーに遡れるか？\n# path: defect -> lot -> lot_operations / lot_parts -> purchase -> supplier\n# lotUsesSupplier / lotMadeOn は queries/materialize_*.rq で urn:derived:chains に\n# 実体化済みの propertyChainAxiom ショートカット（src/load.py が投入時に実行する）\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?defect ?lot ?equipment ?supplier WHERE {\n    VALUES ?customer { <http://example.org/kg/data/customer/C001> }  # 対象顧客はアプリ層で差し替える\n    ?defect ex:defectCustomer ?customer ; ex:defectLot ?lot .\n    OPTIONAL { ?lot ex:lotMadeOn ?equipment . }\n    OPTIONAL { ?lot ex:lotUsesSupplier ?supplier . }\n}\nORDER BY ?defect\n",
+    "status": "done"
+   },
+   "nl_question": "retry-ok"
+  },
+  "toast": [],
+  "warning": [
+   "1回目のクエリは失敗しました（HTTP 400: Parse error: Lexical error at line 1, column 24.  Encountered: <EOF> after prefix \"BROKEN\"\n）。再生成したクエリを確認してください。"
+  ]
+ },
+ "nl_retry-ok_changed": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [],
+  "dataframe": [],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq01"
+   ],
+   [
+    "対象を選ぶ（?product）",
+    "http://example.org/kg/data/product/P001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq01",
+   "main_tabs": "質問する",
+   "nl": null,
+   "nl_question": "ok"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "nl_retry-ok_generated": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "承認して実行",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "SELECT * WHERE { BROKEN"
+  ],
+  "dataframe": [],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "#### 自由入力（自然文 → SPARQL）",
+   "生成された SPARQL（1 回目）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq01"
+   ],
+   [
+    "対象を選ぶ（?product）",
+    "http://example.org/kg/data/product/P001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq01",
+   "main_tabs": "質問する",
+   "nl": {
+    "attempt": 1,
+    "df": null,
+    "errors": [],
+    "q": "retry-ok",
+    "sparql": "SELECT * WHERE { BROKEN",
+    "status": "pending"
+   },
+   "nl_question": "retry-ok"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "options_off_cq06_L0048": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "15 ノード・24 エッジ。濃青=判定対象 / 水色=根拠事実 / 橙=適用ルール / 紫=結論 / 灰色破線=判定不能。エッジはすべて実在トリプル。ノードにカーソルを合わせると属性値を表示。",
+   "参照した判定: 確定（rules の閾値）（urn:src:evidence）",
+   "http://localhost:3030/kg"
+  ],
+  "code": [],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "denominator": "11",
+     "evidence": "data:evidence/R01-L0048",
+     "facts": "data:supplier/S002 http://example.org/kg/data/purchase/PU017 http://example.org/kg/data/partConsumption/LP048",
+     "lot": "data:lot/L0048",
+     "numerator": "2",
+     "observedValue": "0.181818181818181818181818",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio",
+     "undeterminedReason": "None"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "denominator": "30",
+     "evidence": "data:evidence/R02-L0048",
+     "facts": "data:equipment/E003 http://example.org/kg/data/operation/OP048 http://example.org/kg/data/maintenance/M008",
+     "lot": "data:lot/L0048",
+     "numerator": "33",
+     "observedValue": "33",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "30",
+     "thresholdUnit": "days(equipment)",
+     "undeterminedReason": "None"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "denominator": "nan",
+     "evidence": "data:evidence/R03-L0048",
+     "facts": "data:spec/SP017 http://example.org/kg/data/inspection/I048",
+     "lot": "data:lot/L0048",
+     "numerator": "1",
+     "observedValue": "1",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count",
+     "undeterminedReason": "None"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "結果テーブル（全列・3 件）"
+  ],
+  "info": [],
+  "markdown": [
+   "### 判定: 出荷保留",
+   "- **出荷保留** — R03 検査NG　1 件（閾値 1 件）",
+   "- **要注意** — R01 サプライヤー不良率　2 / 11 = 0.18（閾値 0.05）",
+   "- **要注意** — R02 保全間隔超過　33 日（閾値 30 日）",
+   "#### 根拠経路",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq06"
+   ],
+   [
+    "対象を選ぶ（?lot）",
+    "http://example.org/kg/data/lot/L0048"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq06",
+   "last_run": [
+    "cq06",
+    "http://example.org/kg/data/lot/L0048"
+   ],
+   "main_tabs": "質問する",
+   "nl_question": "",
+   "target_cq06": "http://example.org/kg/data/lot/L0048"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "ranking_cq07_P001": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "L0063",
+    "cq07_E003_L0063"
+   ],
+   [
+    "L0078",
+    "cq07_E003_L0078"
+   ],
+   [
+    "L0037",
+    "cq07_S005_L0037"
+   ],
+   [
+    "L0040",
+    "cq07_S005_L0040"
+   ],
+   [
+    "L0040",
+    "cq07_E010_L0040"
+   ],
+   [
+    "L0063",
+    "cq07_S009_L0063"
+   ],
+   [
+    "L0078",
+    "cq07_S011_L0078"
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "ロットを押すと CQ06 でそのロットの根拠経路を開きます。",
+   "ロットを押すと CQ06 でそのロットの根拠経路を開きます。",
+   "ロットを押すと CQ06 でそのロットの根拠経路を開きます。",
+   "ロットを押すと CQ06 でそのロットの根拠経路を開きます。",
+   "ロットを押すと CQ06 でそのロットの根拠経路を開きます。",
+   "既存の Evidence（R01: サプライヤー、R02: 設備）の集計のみで、新たな判定は行っていません。判定不能は除外。R07（設備起因疑い）は判定クエリが未実装のため含みません。参照した判定: 確定（rules の閾値）",
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ07: 製品Xの不良増加の原因候補をルールに基づき順位付けし、根拠経路を示せ (R01, R02, R07)\n# path: product <- lot <- Evidence（urn:src:evidence）-> 根拠事実のサプライヤー / 設備\n#\n# 新たな判定は作らず、既存の Evidence を集計するだけ。製品のロットに付いた Evidence のうち、\n# 根拠事実（evidenceFact）がサプライヤー（R01）または設備（R02）であるものを原因候補とし、\n# 候補ごとの該当ロット数で順位付けする（ORDER BY。同数は同順位としてアプリ層で表示）。\n# 判定不能の Evidence は原因の根拠にならないため除く。R03（検査NG）は根拠が検査・規格のため候補に現れない。\n# R07（設備起因疑い）は判定クエリが未実装のため、現時点では含まれない。\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?cause ?causeType ?causeName (COUNT(DISTINCT ?lot) AS ?lotCount)\n       (GROUP_CONCAT(DISTINCT ?ruleId; separator=\" \") AS ?rules)\n       (GROUP_CONCAT(DISTINCT STR(?lot); separator=\" \") AS ?lots)\nWHERE {\n    VALUES ?product { <http://example.org/kg/data/product/P001> }  # 対象製品はアプリ層で差し替える\n    ?lot ex:lotProduct ?product .\n    GRAPH <urn:src:evidence> {\n        ?ev ex:evidenceSubject ?lot ; ex:evidenceRule ?rule ; ex:conclusion ?conclusion ; ex:evidenceFact ?cause .\n    }\n    FILTER(?conclusion != \"判定不能\")\n    ?cause a ?cls .\n    FILTER(?cls IN (ex:Supplier, ex:Equipment))\n    BIND(IF(?cls = ex:Supplier, \"サプライヤー\", \"設備\") AS ?causeType)\n    ?rule ex:rule_id ?ruleId .\n    OPTIONAL { ?cause ex:supplier_name|ex:equipment_name ?causeName . }\n}\nGROUP BY ?cause ?causeType ?causeName\nORDER BY DESC(?lotCount) ?cause"
+  ],
+  "dataframe": [
+   [
+    {
+     "cause": "data:equipment/E003",
+     "causeName": "組立ライン #3",
+     "causeType": "設備",
+     "lotCount": "2",
+     "lots": "data:lot/L0063 http://example.org/kg/data/lot/L0078",
+     "rules": "R02",
+     "順位": "1"
+    },
+    {
+     "cause": "data:supplier/S005",
+     "causeName": "ミナト金属",
+     "causeType": "サプライヤー",
+     "lotCount": "2",
+     "lots": "data:lot/L0037 http://example.org/kg/data/lot/L0040",
+     "rules": "R01",
+     "順位": "1"
+    },
+    {
+     "cause": "data:equipment/E010",
+     "causeName": "溶接ロボット #10",
+     "causeType": "設備",
+     "lotCount": "1",
+     "lots": "data:lot/L0040",
+     "rules": "R02",
+     "順位": "3"
+    },
+    {
+     "cause": "data:supplier/S009",
+     "causeName": "共栄センサー",
+     "causeType": "サプライヤー",
+     "lotCount": "1",
+     "lots": "data:lot/L0063",
+     "rules": "R01",
+     "順位": "3"
+    },
+    {
+     "cause": "data:supplier/S011",
+     "causeName": "SEA Components",
+     "causeType": "サプライヤー",
+     "lotCount": "1",
+     "lots": "data:lot/L0078",
+     "rules": "R01",
+     "順位": "3"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "1位　E003 組立ライン #3（設備）— 2 ロット・R02",
+   "1位　S005 ミナト金属（サプライヤー）— 2 ロット・R01",
+   "3位　E010 溶接ロボット #10（設備）— 1 ロット・R02",
+   "3位　S009 共栄センサー（サプライヤー）— 1 ロット・R01",
+   "3位　S011 SEA Components（サプライヤー）— 1 ロット・R01",
+   "実行した SPARQL",
+   "結果テーブル（全列・5 件）"
+  ],
+  "info": [],
+  "markdown": [
+   "### 原因候補（該当ロット数の多い順）",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq07"
+   ],
+   [
+    "対象を選ぶ（?product）",
+    "http://example.org/kg/data/product/P001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq07",
+   "last_run": [
+    "cq07",
+    "http://example.org/kg/data/product/P001"
+   ],
+   "main_tabs": "質問する",
+   "nl_question": "",
+   "target_cq07": "http://example.org/kg/data/product/P001"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "ranking_cq07_to_cq06": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "11 ノード・18 エッジ。濃青=判定対象 / 水色=根拠事実 / 橙=適用ルール / 紫=結論 / 灰色破線=判定不能。エッジはすべて実在トリプル。ノードにカーソルを合わせると属性値を表示。",
+   "自己点検: 根拠外の ID・名前・数値、推測・提案表現、該当なしへの読み替えは検出されませんでした。",
+   "参照した判定: 確定（rules の閾値）（urn:src:evidence）",
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ06: ロットLは「要注意」か。判定理由を経路で示せ (R01, R02, R03)\n# path: lot <- Evidence（urn:src:evidence）-> rule / 根拠事実\n#\n# 判定は queries/evidence_r0*.rq が urn:src:evidence に書き戻した ex:Evidence をそのまま読む。\n# アプリの判定・根拠経路・説明文も同じ Evidence を元にするため、結果テーブルと画面の判定は常に一致する。\n# 1 行 = 1 Evidence（該当ルール）。行が無ければどのルールにも該当しない。\n# 判定不能（R02 で保全記録が無いなど）は conclusion「判定不能」と undeterminedReason で返す。\n# 結論の重い順（出荷保留 > 要注意 > 判定不能）の並べ替えはアプリ層で行う。\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator\n       ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\n       (GROUP_CONCAT(DISTINCT STR(?fact); separator=\" \") AS ?facts)\nWHERE {\n    VALUES ?lot { <http://example.org/kg/data/lot/L0063> }  # 対象ロットはアプリ層で差し替える\n    GRAPH <urn:src:evidence> {\n        ?evidence ex:evidenceSubject ?lot ;\n                  ex:evidenceRule ?rule ;\n                  ex:conclusion ?conclusion ;\n                  ex:appliedThreshold ?threshold ;\n                  ex:evidenceFact ?fact .\n        OPTIONAL { ?evidence ex:observedValue ?observedValue . }\n        OPTIONAL { ?evidence ex:observedNumerator ?numerator . }\n        OPTIONAL { ?evidence ex:observedDenominator ?denominator . }\n        OPTIONAL { ?evidence ex:undeterminedReason ?undeterminedReason . }\n    }\n    ?rule ex:rule_id ?ruleId ; ex:rule_name ?ruleName .\n    OPTIONAL { ?rule ex:comparison ?comparison . }\n    OPTIONAL { ?rule ex:threshold_unit ?thresholdUnit . }\n}\nGROUP BY ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator\n         ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\nORDER BY ?ruleId"
+  ],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "denominator": "9",
+     "evidence": "data:evidence/R01-L0063",
+     "facts": "data:supplier/S009 http://example.org/kg/data/purchase/PU042 http://example.org/kg/data/partConsumption/LP063",
+     "lot": "data:lot/L0063",
+     "numerator": "2",
+     "observedValue": "0.222222222222222222222222",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio",
+     "undeterminedReason": "None"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "denominator": "30",
+     "evidence": "data:evidence/R02-L0063",
+     "facts": "data:equipment/E003 http://example.org/kg/data/operation/OP063 http://example.org/kg/data/maintenance/M008",
+     "lot": "data:lot/L0063",
+     "numerator": "56",
+     "observedValue": "56",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "30",
+     "thresholdUnit": "days(equipment)",
+     "undeterminedReason": "None"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "実行した SPARQL",
+   "結果テーブル（全列・2 件）"
+  ],
+  "info": [],
+  "markdown": [
+   "### 判定: 要注意",
+   "- **要注意** — R01 サプライヤー不良率　2 / 9 = 0.22（閾値 0.05）",
+   "- **要注意** — R02 保全間隔超過　56 日（閾値 30 日）",
+   "#### 根拠経路",
+   "#### 説明",
+   "スタブ説明: 判断ルールR01（サプライヤー不良率）=要注意、判断ルールR02（保全間隔超過）=要注意",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq06"
+   ],
+   [
+    "対象を選ぶ（?lot）",
+    "http://example.org/kg/data/lot/L0063"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq06",
+   "evidence_graph": "urn:src:evidence",
+   "last_run": [
+    "cq06",
+    "http://example.org/kg/data/lot/L0063"
+   ],
+   "main_tabs": "質問する",
+   "nl_question": "",
+   "target_cq06": "http://example.org/kg/data/lot/L0063"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "sidebar_regenerate": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "15 ノード・24 エッジ。濃青=判定対象 / 水色=根拠事実 / 橙=適用ルール / 紫=結論 / 灰色破線=判定不能。エッジはすべて実在トリプル。ノードにカーソルを合わせると属性値を表示。",
+   "自己点検: 根拠外の ID・名前・数値、推測・提案表現、該当なしへの読み替えは検出されませんでした。",
+   "参照した判定: 確定（rules の閾値）（urn:src:evidence）",
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ06: ロットLは「要注意」か。判定理由を経路で示せ (R01, R02, R03)\n# path: lot <- Evidence（urn:src:evidence）-> rule / 根拠事実\n#\n# 判定は queries/evidence_r0*.rq が urn:src:evidence に書き戻した ex:Evidence をそのまま読む。\n# アプリの判定・根拠経路・説明文も同じ Evidence を元にするため、結果テーブルと画面の判定は常に一致する。\n# 1 行 = 1 Evidence（該当ルール）。行が無ければどのルールにも該当しない。\n# 判定不能（R02 で保全記録が無いなど）は conclusion「判定不能」と undeterminedReason で返す。\n# 結論の重い順（出荷保留 > 要注意 > 判定不能）の並べ替えはアプリ層で行う。\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator\n       ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\n       (GROUP_CONCAT(DISTINCT STR(?fact); separator=\" \") AS ?facts)\nWHERE {\n    VALUES ?lot { <http://example.org/kg/data/lot/L0048> }  # 対象ロットはアプリ層で差し替える\n    GRAPH <urn:src:evidence> {\n        ?evidence ex:evidenceSubject ?lot ;\n                  ex:evidenceRule ?rule ;\n                  ex:conclusion ?conclusion ;\n                  ex:appliedThreshold ?threshold ;\n                  ex:evidenceFact ?fact .\n        OPTIONAL { ?evidence ex:observedValue ?observedValue . }\n        OPTIONAL { ?evidence ex:observedNumerator ?numerator . }\n        OPTIONAL { ?evidence ex:observedDenominator ?denominator . }\n        OPTIONAL { ?evidence ex:undeterminedReason ?undeterminedReason . }\n    }\n    ?rule ex:rule_id ?ruleId ; ex:rule_name ?ruleName .\n    OPTIONAL { ?rule ex:comparison ?comparison . }\n    OPTIONAL { ?rule ex:threshold_unit ?thresholdUnit . }\n}\nGROUP BY ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator\n         ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\nORDER BY ?ruleId"
+  ],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "denominator": "11",
+     "evidence": "data:evidence/R01-L0048",
+     "facts": "data:supplier/S002 http://example.org/kg/data/purchase/PU017 http://example.org/kg/data/partConsumption/LP048",
+     "lot": "data:lot/L0048",
+     "numerator": "2",
+     "observedValue": "0.181818181818181818181818",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio",
+     "undeterminedReason": "None"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "denominator": "30",
+     "evidence": "data:evidence/R02-L0048",
+     "facts": "data:equipment/E003 http://example.org/kg/data/operation/OP048 http://example.org/kg/data/maintenance/M008",
+     "lot": "data:lot/L0048",
+     "numerator": "33",
+     "observedValue": "33",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "30",
+     "thresholdUnit": "days(equipment)",
+     "undeterminedReason": "None"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "denominator": "nan",
+     "evidence": "data:evidence/R03-L0048",
+     "facts": "data:spec/SP017 http://example.org/kg/data/inspection/I048",
+     "lot": "data:lot/L0048",
+     "numerator": "1",
+     "observedValue": "1",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count",
+     "undeterminedReason": "None"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "実行した SPARQL",
+   "結果テーブル（全列・3 件）"
+  ],
+  "info": [],
+  "markdown": [
+   "### 判定: 出荷保留",
+   "- **出荷保留** — R03 検査NG　1 件（閾値 1 件）",
+   "- **要注意** — R01 サプライヤー不良率　2 / 11 = 0.18（閾値 0.05）",
+   "- **要注意** — R02 保全間隔超過　33 日（閾値 30 日）",
+   "#### 根拠経路",
+   "#### 説明",
+   "スタブ説明: 判断ルールR03（検査NG）=出荷保留、判断ルールR01（サプライヤー不良率）=要注意、判断ルールR02（保全間隔超過）=要注意",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq06"
+   ],
+   [
+    "対象を選ぶ（?lot）",
+    "http://example.org/kg/data/lot/L0048"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq06",
+   "last_run": [
+    "cq06",
+    "http://example.org/kg/data/lot/L0048"
+   ],
+   "main_tabs": "質問する",
+   "nl_question": "",
+   "target_cq06": "http://example.org/kg/data/lot/L0048"
+  },
+  "toast": [
+   "再判定: R01 判定不能 20件, R01 要注意 53件, R02 判定不能 18件, R02 要注意 20件, R03 出荷保留 17件, R05 代替候補 1件"
+  ],
+  "warning": []
+ },
+ "sidebar_reload": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "15 ノード・24 エッジ。濃青=判定対象 / 水色=根拠事実 / 橙=適用ルール / 紫=結論 / 灰色破線=判定不能。エッジはすべて実在トリプル。ノードにカーソルを合わせると属性値を表示。",
+   "自己点検: 根拠外の ID・名前・数値、推測・提案表現、該当なしへの読み替えは検出されませんでした。",
+   "参照した判定: 確定（rules の閾値）（urn:src:evidence）",
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ06: ロットLは「要注意」か。判定理由を経路で示せ (R01, R02, R03)\n# path: lot <- Evidence（urn:src:evidence）-> rule / 根拠事実\n#\n# 判定は queries/evidence_r0*.rq が urn:src:evidence に書き戻した ex:Evidence をそのまま読む。\n# アプリの判定・根拠経路・説明文も同じ Evidence を元にするため、結果テーブルと画面の判定は常に一致する。\n# 1 行 = 1 Evidence（該当ルール）。行が無ければどのルールにも該当しない。\n# 判定不能（R02 で保全記録が無いなど）は conclusion「判定不能」と undeterminedReason で返す。\n# 結論の重い順（出荷保留 > 要注意 > 判定不能）の並べ替えはアプリ層で行う。\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator\n       ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\n       (GROUP_CONCAT(DISTINCT STR(?fact); separator=\" \") AS ?facts)\nWHERE {\n    VALUES ?lot { <http://example.org/kg/data/lot/L0048> }  # 対象ロットはアプリ層で差し替える\n    GRAPH <urn:src:evidence> {\n        ?evidence ex:evidenceSubject ?lot ;\n                  ex:evidenceRule ?rule ;\n                  ex:conclusion ?conclusion ;\n                  ex:appliedThreshold ?threshold ;\n                  ex:evidenceFact ?fact .\n        OPTIONAL { ?evidence ex:observedValue ?observedValue . }\n        OPTIONAL { ?evidence ex:observedNumerator ?numerator . }\n        OPTIONAL { ?evidence ex:observedDenominator ?denominator . }\n        OPTIONAL { ?evidence ex:undeterminedReason ?undeterminedReason . }\n    }\n    ?rule ex:rule_id ?ruleId ; ex:rule_name ?ruleName .\n    OPTIONAL { ?rule ex:comparison ?comparison . }\n    OPTIONAL { ?rule ex:threshold_unit ?thresholdUnit . }\n}\nGROUP BY ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator\n         ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\nORDER BY ?ruleId"
+  ],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "denominator": "11",
+     "evidence": "data:evidence/R01-L0048",
+     "facts": "data:supplier/S002 http://example.org/kg/data/purchase/PU017 http://example.org/kg/data/partConsumption/LP048",
+     "lot": "data:lot/L0048",
+     "numerator": "2",
+     "observedValue": "0.181818181818181818181818",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio",
+     "undeterminedReason": "None"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "denominator": "30",
+     "evidence": "data:evidence/R02-L0048",
+     "facts": "data:equipment/E003 http://example.org/kg/data/operation/OP048 http://example.org/kg/data/maintenance/M008",
+     "lot": "data:lot/L0048",
+     "numerator": "33",
+     "observedValue": "33",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "30",
+     "thresholdUnit": "days(equipment)",
+     "undeterminedReason": "None"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "denominator": "nan",
+     "evidence": "data:evidence/R03-L0048",
+     "facts": "data:spec/SP017 http://example.org/kg/data/inspection/I048",
+     "lot": "data:lot/L0048",
+     "numerator": "1",
+     "observedValue": "1",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count",
+     "undeterminedReason": "None"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "実行した SPARQL",
+   "結果テーブル（全列・3 件）"
+  ],
+  "info": [],
+  "markdown": [
+   "### 判定: 出荷保留",
+   "- **出荷保留** — R03 検査NG　1 件（閾値 1 件）",
+   "- **要注意** — R01 サプライヤー不良率　2 / 11 = 0.18（閾値 0.05）",
+   "- **要注意** — R02 保全間隔超過　33 日（閾値 30 日）",
+   "#### 根拠経路",
+   "#### 説明",
+   "スタブ説明: 判断ルールR03（検査NG）=出荷保留、判断ルールR01（サプライヤー不良率）=要注意、判断ルールR02（保全間隔超過）=要注意",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq06"
+   ],
+   [
+    "対象を選ぶ（?lot）",
+    "http://example.org/kg/data/lot/L0048"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq06",
+   "last_run": [
+    "cq06",
+    "http://example.org/kg/data/lot/L0048"
+   ],
+   "main_tabs": "質問する",
+   "nl_question": "",
+   "target_cq06": "http://example.org/kg/data/lot/L0048"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "tab_graph": {
+  "button": [
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "19 グラフ・6,968 トリプル（スキーマ urn:schema:kg を含む全名前付きグラフ）",
+   "http://localhost:3030/kg"
+  ],
+  "code": [],
+  "dataframe": [
+   [
+    {
+     "g": "urn:derived:chains",
+     "triples": "240"
+    },
+    {
+     "g": "urn:schema:kg",
+     "triples": "476"
+    },
+    {
+     "g": "urn:src:bom",
+     "triples": "400"
+    },
+    {
+     "g": "urn:src:customers",
+     "triples": "75"
+    },
+    {
+     "g": "urn:src:defects",
+     "triples": "210"
+    },
+    {
+     "g": "urn:src:equipment",
+     "triples": "90"
+    },
+    {
+     "g": "urn:src:evidence",
+     "triples": "1423"
+    },
+    {
+     "g": "urn:src:inspections",
+     "triples": "560"
+    },
+    {
+     "g": "urn:src:lot_operations",
+     "triples": "560"
+    },
+    {
+     "g": "urn:src:lot_parts",
+     "triples": "400"
+    },
+    {
+     "g": "urn:src:lots",
+     "triples": "560"
+    },
+    {
+     "g": "urn:src:maintenance",
+     "triples": "240"
+    },
+    {
+     "g": "urn:src:orders_shipments",
+     "triples": "537"
+    },
+    {
+     "g": "urn:src:parts",
+     "triples": "240"
+    },
+    {
+     "g": "urn:src:products",
+     "triples": "100"
+    },
+    {
+     "g": "urn:src:purchases",
+     "triples": "560"
+    },
+    {
+     "g": "urn:src:rules",
+     "triples": "82"
+    },
+    {
+     "g": "urn:src:specs",
+     "triples": "140"
+    },
+    {
+     "g": "urn:src:suppliers",
+     "triples": "75"
+    }
+   ],
+   [
+    {
+     "class": "ex:Evidence",
+     "instances": "129",
+     "label": "判定根拠"
+    },
+    {
+     "class": "ex:BomLine",
+     "instances": "80",
+     "label": "部品表行"
+    },
+    {
+     "class": "ex:Inspection",
+     "instances": "80",
+     "label": "検査結果"
+    },
+    {
+     "class": "ex:Lot",
+     "instances": "80",
+     "label": "製造ロット"
+    },
+    {
+     "class": "ex:Operation",
+     "instances": "80",
+     "label": "工程実績"
+    },
+    {
+     "class": "ex:PartConsumption",
+     "instances": "80",
+     "label": "ロット部品消費"
+    },
+    {
+     "class": "ex:Purchase",
+     "instances": "80",
+     "label": "購買（部品ロット）"
+    },
+    {
+     "class": "ex:Order",
+     "instances": "60",
+     "label": "受注・出荷"
+    },
+    {
+     "class": "ex:Maintenance",
+     "instances": "40",
+     "label": "保全履歴"
+    },
+    {
+     "class": "ex:Part",
+     "instances": "40",
+     "label": "部品"
+    },
+    {
+     "class": "ex:Defect",
+     "instances": "30",
+     "label": "不良・クレーム"
+    },
+    {
+     "class": "ex:Product",
+     "instances": "20",
+     "label": "製品"
+    },
+    {
+     "class": "ex:Spec",
+     "instances": "20",
+     "label": "規格要件"
+    },
+    {
+     "class": "ex:Customer",
+     "instances": "15",
+     "label": "顧客"
+    },
+    {
+     "class": "ex:Equipment",
+     "instances": "15",
+     "label": "設備"
+    },
+    {
+     "class": "ex:Supplier",
+     "instances": "15",
+     "label": "サプライヤー"
+    },
+    {
+     "class": "ex:Rule",
+     "instances": "8",
+     "label": "判断ルール"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "#### グラフ別トリプル数",
+   "#### クラス別インスタンス数",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [],
+  "state": {
+   "main_tabs": "グラフを見る"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "table_cq01": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ01: 製品Xを構成する部品と、各部品のサプライヤーは？\n# path: product -> bom -> part -> purchase -> supplier\n# tdb2:unionDefaultGraph=true のため、GRAPH句なしで全名前付きグラフを横断できる\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?part ?partName ?supplier ?supplierName WHERE {\n    VALUES ?product { <http://example.org/kg/data/product/P001> }  # 対象製品はアプリ層で差し替える\n    ?bom ex:bomProduct ?product ; ex:bomPart ?part .\n    ?part ex:part_name ?partName .\n    OPTIONAL {\n        ?purchase ex:purchasedPart ?part ; ex:purchasedFrom ?supplier .\n        ?supplier ex:supplier_name ?supplierName .\n    }\n}\nORDER BY ?part ?supplier"
+  ],
+  "dataframe": [
+   [
+    {
+     "part": "data:part/PT001",
+     "partName": "ベアリング 01",
+     "supplier": "data:supplier/S001",
+     "supplierName": "東和精機"
+    },
+    {
+     "part": "data:part/PT001",
+     "partName": "ベアリング 01",
+     "supplier": "data:supplier/S008",
+     "supplierName": "アオバ樹脂"
+    },
+    {
+     "part": "data:part/PT002",
+     "partName": "シール 02",
+     "supplier": "data:supplier/S005",
+     "supplierName": "ミナト金属"
+    },
+    {
+     "part": "data:part/PT002",
+     "partName": "シール 02",
+     "supplier": "data:supplier/S009",
+     "supplierName": "共栄センサー"
+    },
+    {
+     "part": "data:part/PT003",
+     "partName": "基板 03",
+     "supplier": "data:supplier/S003",
+     "supplierName": "サンエイ電子"
+    },
+    {
+     "part": "data:part/PT003",
+     "partName": "基板 03",
+     "supplier": "data:supplier/S010",
+     "supplierName": "ナガイ電線"
+    },
+    {
+     "part": "data:part/PT004",
+     "partName": "ハウジング 04",
+     "supplier": "data:supplier/S004",
+     "supplierName": "大成シール工業"
+    },
+    {
+     "part": "data:part/PT004",
+     "partName": "ハウジング 04",
+     "supplier": "data:supplier/S011",
+     "supplierName": "SEA Components"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "実行した SPARQL",
+   "結果テーブル（全列）"
+  ],
+  "info": [],
+  "markdown": [
+   "**8 件**",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq01"
+   ],
+   [
+    "対象を選ぶ（?product）",
+    "http://example.org/kg/data/product/P001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq01",
+   "last_run": [
+    "cq01",
+    "http://example.org/kg/data/product/P001"
+   ],
+   "main_tabs": "質問する",
+   "nl_question": ""
+  },
+  "toast": [],
+  "warning": []
+ },
+ "table_cq02": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ02: 顧客Zのクレームは、どのロット・工程・部品・サプライヤーに遡れるか？\n# path: defect -> lot -> lot_operations / lot_parts -> purchase -> supplier\n# lotUsesSupplier / lotMadeOn は queries/materialize_*.rq で urn:derived:chains に\n# 実体化済みの propertyChainAxiom ショートカット（src/load.py が投入時に実行する）\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?defect ?lot ?equipment ?supplier WHERE {\n    VALUES ?customer { <http://example.org/kg/data/customer/C001> }  # 対象顧客はアプリ層で差し替える\n    ?defect ex:defectCustomer ?customer ; ex:defectLot ?lot .\n    OPTIONAL { ?lot ex:lotMadeOn ?equipment . }\n    OPTIONAL { ?lot ex:lotUsesSupplier ?supplier . }\n}\nORDER BY ?defect"
+  ],
+  "dataframe": [
+   [
+    {
+     "defect": "data:defect/D001",
+     "equipment": "data:equipment/E001",
+     "lot": "data:lot/L0001",
+     "supplier": "data:supplier/S005"
+    },
+    {
+     "defect": "data:defect/D016",
+     "equipment": "data:equipment/E003",
+     "lot": "data:lot/L0048",
+     "supplier": "data:supplier/S002"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "実行した SPARQL",
+   "結果テーブル（全列）"
+  ],
+  "info": [],
+  "markdown": [
+   "**2 件**",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq02"
+   ],
+   [
+    "対象を選ぶ（?customer）",
+    "http://example.org/kg/data/customer/C001"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq02",
+   "last_run": [
+    "cq02",
+    "http://example.org/kg/data/customer/C001"
+   ],
+   "main_tabs": "質問する",
+   "nl_question": ""
+  },
+  "toast": [],
+  "warning": []
+ },
+ "table_cq03": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ03: サプライヤーSの部品を使った製品は、どの顧客に出荷済みか？ (related_rules: R08)\n# path: supplier -> purchase -> lot_parts -> lot -> orders_shipments -> customer\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT DISTINCT ?product ?customer WHERE {\n    VALUES ?supplier { <http://example.org/kg/data/supplier/S005> }  # 対象サプライヤーはアプリ層で差し替える\n    ?lot ex:lotUsesSupplier ?supplier ;\n         ex:lotProduct ?product .\n    ?order ex:shippedLot ?lot ; ex:orderCustomer ?customer .\n}\nORDER BY ?product ?customer"
+  ],
+  "dataframe": [
+   [
+    {
+     "customer": "data:customer/C013",
+     "product": "data:product/P001"
+    },
+    {
+     "customer": "data:customer/C006",
+     "product": "data:product/P002"
+    },
+    {
+     "customer": "data:customer/C007",
+     "product": "data:product/P002"
+    },
+    {
+     "customer": "data:customer/C003",
+     "product": "data:product/P003"
+    },
+    {
+     "customer": "data:customer/C012",
+     "product": "data:product/P003"
+    },
+    {
+     "customer": "data:customer/C002",
+     "product": "data:product/P005"
+    },
+    {
+     "customer": "data:customer/C003",
+     "product": "data:product/P005"
+    },
+    {
+     "customer": "data:customer/C005",
+     "product": "data:product/P005"
+    },
+    {
+     "customer": "data:customer/C011",
+     "product": "data:product/P007"
+    },
+    {
+     "customer": "data:customer/C001",
+     "product": "data:product/P009"
+    },
+    {
+     "customer": "data:customer/C004",
+     "product": "data:product/P009"
+    },
+    {
+     "customer": "data:customer/C009",
+     "product": "data:product/P009"
+    },
+    {
+     "customer": "data:customer/C011",
+     "product": "data:product/P009"
+    },
+    {
+     "customer": "data:customer/C015",
+     "product": "data:product/P009"
+    },
+    {
+     "customer": "data:customer/C006",
+     "product": "data:product/P011"
+    },
+    {
+     "customer": "data:customer/C012",
+     "product": "data:product/P011"
+    },
+    {
+     "customer": "data:customer/C009",
+     "product": "data:product/P012"
+    },
+    {
+     "customer": "data:customer/C002",
+     "product": "data:product/P013"
+    },
+    {
+     "customer": "data:customer/C014",
+     "product": "data:product/P013"
+    },
+    {
+     "customer": "data:customer/C007",
+     "product": "data:product/P014"
+    },
+    {
+     "customer": "data:customer/C012",
+     "product": "data:product/P014"
+    },
+    {
+     "customer": "data:customer/C010",
+     "product": "data:product/P015"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "実行した SPARQL",
+   "結果テーブル（全列）"
+  ],
+  "info": [],
+  "markdown": [
+   "**22 件**",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq03"
+   ],
+   [
+    "対象を選ぶ（?supplier）",
+    "http://example.org/kg/data/supplier/S005"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq03",
+   "last_run": [
+    "cq03",
+    "http://example.org/kg/data/supplier/S005"
+   ],
+   "main_tabs": "質問する",
+   "nl_question": ""
+  },
+  "toast": [],
+  "warning": []
+ },
+ "table_cq04": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ04: サプライヤー別・部品別の直近3ロット不良率は？ (related_rules: R01, threshold=0.05 ratio)\n# path: supplier -> purchase -> lot_parts -> lot -> defects（集計）\n#\n# 簡略化: SPARQL 1.1 では「グループごとに直近3件」のウィンドウ集計を素直に表現できないため、\n# ここではサプライヤー×部品の組み合わせに紐づく全ロットに対する不良率を計算する。\n# 厳密な「直近3ロット」に絞る場合はアプリ層（Python）で lot.start_date 降順に3件へ絞ってから\n# 本クエリと同じ計算をポスト処理する。\n# 閾値はハードコードせず data:rule/R01 の ex:threshold から取得する（判定根拠を経路で追える）。\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?supplier ?part\n       (COUNT(DISTINCT ?lot) AS ?lotCount)\n       (COUNT(DISTINCT ?defect) AS ?defectCount)\n       ((COUNT(DISTINCT ?defect)) / (COUNT(DISTINCT ?lot)) AS ?defectRate)\n       ?threshold\nWHERE {\n    ?consumption ex:consumedInLot ?lot ; ex:consumedPurchase ?purchase .\n    ?purchase ex:purchasedPart ?part ; ex:purchasedFrom ?supplier .\n    OPTIONAL { ?defect ex:defectLot ?lot }\n    <http://example.org/kg/data/rule/R01> ex:threshold ?threshold .\n}\nGROUP BY ?supplier ?part ?threshold\nHAVING (COUNT(DISTINCT ?defect) / COUNT(DISTINCT ?lot) >= ?threshold)\nORDER BY DESC(?defectRate)"
+  ],
+  "dataframe": [
+   [
+    {
+     "defectCount": "2",
+     "defectRate": "2.0",
+     "lotCount": "1",
+     "part": "data:part/PT024",
+     "supplier": "data:supplier/S001",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "4",
+     "defectRate": "2.0",
+     "lotCount": "2",
+     "part": "data:part/PT010",
+     "supplier": "data:supplier/S005",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "1",
+     "defectRate": "1.0",
+     "lotCount": "1",
+     "part": "data:part/PT012",
+     "supplier": "data:supplier/S012",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "1",
+     "defectRate": "1.0",
+     "lotCount": "1",
+     "part": "data:part/PT014",
+     "supplier": "data:supplier/S005",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "1",
+     "defectRate": "1.0",
+     "lotCount": "1",
+     "part": "data:part/PT020",
+     "supplier": "data:supplier/S005",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "1",
+     "defectRate": "1.0",
+     "lotCount": "1",
+     "part": "data:part/PT028",
+     "supplier": "data:supplier/S005",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "3",
+     "defectRate": "1.0",
+     "lotCount": "3",
+     "part": "data:part/PT018",
+     "supplier": "data:supplier/S005",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "4",
+     "defectRate": "1.0",
+     "lotCount": "4",
+     "part": "data:part/PT035",
+     "supplier": "data:supplier/S005",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "3",
+     "defectRate": "0.75",
+     "lotCount": "4",
+     "part": "data:part/PT002",
+     "supplier": "data:supplier/S005",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "2",
+     "defectRate": "0.666666666666666666666667",
+     "lotCount": "3",
+     "part": "data:part/PT032",
+     "supplier": "data:supplier/S009",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "1",
+     "defectRate": "0.5",
+     "lotCount": "2",
+     "part": "data:part/PT002",
+     "supplier": "data:supplier/S009",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "1",
+     "defectRate": "0.5",
+     "lotCount": "2",
+     "part": "data:part/PT005",
+     "supplier": "data:supplier/S005",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "1",
+     "defectRate": "0.5",
+     "lotCount": "2",
+     "part": "data:part/PT006",
+     "supplier": "data:supplier/S005",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "1",
+     "defectRate": "0.5",
+     "lotCount": "2",
+     "part": "data:part/PT011",
+     "supplier": "data:supplier/S003",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "1",
+     "defectRate": "0.5",
+     "lotCount": "2",
+     "part": "data:part/PT026",
+     "supplier": "data:supplier/S011",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "1",
+     "defectRate": "0.333333333333333333333333",
+     "lotCount": "3",
+     "part": "data:part/PT017",
+     "supplier": "data:supplier/S002",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "1",
+     "defectRate": "0.333333333333333333333333",
+     "lotCount": "3",
+     "part": "data:part/PT025",
+     "supplier": "data:supplier/S002",
+     "threshold": "0.05"
+    },
+    {
+     "defectCount": "1",
+     "defectRate": "0.333333333333333333333333",
+     "lotCount": "3",
+     "part": "data:part/PT030",
+     "supplier": "data:supplier/S015",
+     "threshold": "0.05"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "実行した SPARQL",
+   "結果テーブル（全列）"
+  ],
+  "info": [],
+  "markdown": [
+   "**18 件**",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq04"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq04",
+   "last_run": [
+    "cq04",
+    null
+   ],
+   "main_tabs": "質問する",
+   "nl_question": ""
+  },
+  "toast": [],
+  "warning": []
+ },
+ "table_cq05": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ05: 設備別の、保全実施から次の不良発生までの平均日数は？ (related_rules: R02, R07)\n# path: equipment -> maintenance / lot_operations -> lot -> defects（集計）\n#\n# 簡略化: 日付の平均計算は SPARQL/エンジン間で xsd:date の減算・変換の扱いが揺れるため、\n# ここでは「各保全実施日ごとに、その後最初に発生した不良の報告日」までを1行ずつ返す。\n# 平均日数（(nextDefectDate - maint_date) の平均）はアプリ層（Python）で計算する\n# （CLAUDE.md: 数値計算はSPARQL/Python側、LLMには結果の説明のみ担わせる）。\nPREFIX ex:   <http://example.org/kg/ontology#>\n\nSELECT ?equipment ?maint_date (MIN(?defect_date) AS ?nextDefectDate) WHERE {\n    ?maint ex:maintainedEquipment ?equipment ; ex:maint_date ?maint_date .\n    ?lot ex:lotMadeOn ?equipment .\n    ?defect ex:defectLot ?lot ; ex:reported_date ?defect_date .\n    FILTER(?defect_date > ?maint_date)\n}\nGROUP BY ?equipment ?maint_date\nORDER BY ?equipment ?maint_date"
+  ],
+  "dataframe": [
+   [
+    {
+     "保全回数": "2",
+     "平均日数": "9.5",
+     "最短日数": "7",
+     "最長日数": "12",
+     "設備": "E002"
+    },
+    {
+     "保全回数": "2",
+     "平均日数": "3.5",
+     "最短日数": "1",
+     "最長日数": "6",
+     "設備": "E003"
+    },
+    {
+     "保全回数": "2",
+     "平均日数": "98.5",
+     "最短日数": "84",
+     "最長日数": "113",
+     "設備": "E004"
+    },
+    {
+     "保全回数": "2",
+     "平均日数": "48.0",
+     "最短日数": "32",
+     "最長日数": "64",
+     "設備": "E005"
+    },
+    {
+     "保全回数": "1",
+     "平均日数": "59.0",
+     "最短日数": "59",
+     "最長日数": "59",
+     "設備": "E007"
+    },
+    {
+     "保全回数": "1",
+     "平均日数": "5.0",
+     "最短日数": "5",
+     "最長日数": "5",
+     "設備": "E011"
+    },
+    {
+     "保全回数": "2",
+     "平均日数": "45.0",
+     "最短日数": "31",
+     "最長日数": "59",
+     "設備": "E012"
+    }
+   ],
+   [
+    {
+     "equipment": "data:equipment/E002",
+     "maint_date": "2026-05-12",
+     "nextDefectDate": "2026-05-24",
+     "日数": "12"
+    },
+    {
+     "equipment": "data:equipment/E002",
+     "maint_date": "2026-06-26",
+     "nextDefectDate": "2026-07-03",
+     "日数": "7"
+    },
+    {
+     "equipment": "data:equipment/E003",
+     "maint_date": "2026-05-10",
+     "nextDefectDate": "2026-05-16",
+     "日数": "6"
+    },
+    {
+     "equipment": "data:equipment/E003",
+     "maint_date": "2026-06-12",
+     "nextDefectDate": "2026-06-13",
+     "日数": "1"
+    },
+    {
+     "equipment": "data:equipment/E004",
+     "maint_date": "2026-05-02",
+     "nextDefectDate": "2026-08-23",
+     "日数": "113"
+    },
+    {
+     "equipment": "data:equipment/E004",
+     "maint_date": "2026-05-31",
+     "nextDefectDate": "2026-08-23",
+     "日数": "84"
+    },
+    {
+     "equipment": "data:equipment/E005",
+     "maint_date": "2026-06-28",
+     "nextDefectDate": "2026-08-31",
+     "日数": "64"
+    },
+    {
+     "equipment": "data:equipment/E005",
+     "maint_date": "2026-07-30",
+     "nextDefectDate": "2026-08-31",
+     "日数": "32"
+    },
+    {
+     "equipment": "data:equipment/E007",
+     "maint_date": "2026-05-06",
+     "nextDefectDate": "2026-07-04",
+     "日数": "59"
+    },
+    {
+     "equipment": "data:equipment/E011",
+     "maint_date": "2026-07-29",
+     "nextDefectDate": "2026-08-03",
+     "日数": "5"
+    },
+    {
+     "equipment": "data:equipment/E012",
+     "maint_date": "2026-06-07",
+     "nextDefectDate": "2026-08-05",
+     "日数": "59"
+    },
+    {
+     "equipment": "data:equipment/E012",
+     "maint_date": "2026-07-05",
+     "nextDefectDate": "2026-08-05",
+     "日数": "31"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "実行した SPARQL",
+   "結果テーブル（全列）"
+  ],
+  "info": [],
+  "markdown": [
+   "**12 件**",
+   "**設備別の平均日数**（保全実施日 → その後最初の不良報告日。Python で計算）",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq05"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq05",
+   "last_run": [
+    "cq05",
+    null
+   ],
+   "main_tabs": "質問する",
+   "nl_question": ""
+  },
+  "toast": [],
+  "warning": []
+ },
+ "whatif_0.05": {
+  "button": [
+   [
+    "再判定",
+    null
+   ],
+   [
+    "L0001  R01",
+    "open_両方_L0001"
+   ],
+   [
+    "L0002  R01",
+    "open_両方_L0002"
+   ],
+   [
+    "L0003  R01+R03",
+    "open_両方_L0003"
+   ],
+   [
+    "L0004  R01",
+    "open_両方_L0004"
+   ],
+   [
+    "L0005  R01+R03",
+    "open_両方_L0005"
+   ],
+   [
+    "L0006  R01",
+    "open_両方_L0006"
+   ],
+   [
+    "L0007  R01",
+    "open_両方_L0007"
+   ],
+   [
+    "L0008  R01+R03",
+    "open_両方_L0008"
+   ],
+   [
+    "L0009  R01+R03",
+    "open_両方_L0009"
+   ],
+   [
+    "L0010  R01",
+    "open_両方_L0010"
+   ],
+   [
+    "L0011  R01",
+    "open_両方_L0011"
+   ],
+   [
+    "L0013  R01+R03",
+    "open_両方_L0013"
+   ],
+   [
+    "L0015  R01",
+    "open_両方_L0015"
+   ],
+   [
+    "L0016  R01",
+    "open_両方_L0016"
+   ],
+   [
+    "L0018  R03",
+    "open_両方_L0018"
+   ],
+   [
+    "L0020  R01",
+    "open_両方_L0020"
+   ],
+   [
+    "L0023  R01",
+    "open_両方_L0023"
+   ],
+   [
+    "L0026  R01",
+    "open_両方_L0026"
+   ],
+   [
+    "L0028  R01+R03",
+    "open_両方_L0028"
+   ],
+   [
+    "L0029  R01",
+    "open_両方_L0029"
+   ],
+   [
+    "L0030  R01",
+    "open_両方_L0030"
+   ],
+   [
+    "L0031  R01",
+    "open_両方_L0031"
+   ],
+   [
+    "L0032  R01+R03",
+    "open_両方_L0032"
+   ],
+   [
+    "L0033  R01+R03",
+    "open_両方_L0033"
+   ],
+   [
+    "L0035  R01",
+    "open_両方_L0035"
+   ],
+   [
+    "L0036  R01",
+    "open_両方_L0036"
+   ],
+   [
+    "L0037  R01",
+    "open_両方_L0037"
+   ],
+   [
+    "L0038  R03",
+    "open_両方_L0038"
+   ],
+   [
+    "L0039  R01",
+    "open_両方_L0039"
+   ],
+   [
+    "L0040  R01+R02",
+    "open_両方_L0040"
+   ],
+   [
+    "L0041  R01+R03",
+    "open_両方_L0041"
+   ],
+   [
+    "L0043  R01+R03",
+    "open_両方_L0043"
+   ],
+   [
+    "L0044  R02",
+    "open_両方_L0044"
+   ],
+   [
+    "L0045  R01",
+    "open_両方_L0045"
+   ],
+   [
+    "L0047  R01",
+    "open_両方_L0047"
+   ],
+   [
+    "L0048  R01+R02+R03",
+    "open_両方_L0048"
+   ],
+   [
+    "L0049  R02",
+    "open_両方_L0049"
+   ],
+   [
+    "L0050  R01",
+    "open_両方_L0050"
+   ],
+   [
+    "L0051  R01",
+    "open_両方_L0051"
+   ],
+   [
+    "L0052  R01",
+    "open_両方_L0052"
+   ],
+   [
+    "L0053  R01+R02",
+    "open_両方_L0053"
+   ],
+   [
+    "L0054  R01",
+    "open_両方_L0054"
+   ],
+   [
+    "L0055  R02",
+    "open_両方_L0055"
+   ],
+   [
+    "L0057  R01+R03",
+    "open_両方_L0057"
+   ],
+   [
+    "L0058  R02",
+    "open_両方_L0058"
+   ],
+   [
+    "L0060  R02",
+    "open_両方_L0060"
+   ],
+   [
+    "L0062  R01",
+    "open_両方_L0062"
+   ],
+   [
+    "L0063  R01+R02",
+    "open_両方_L0063"
+   ],
+   [
+    "L0064  R01+R02",
+    "open_両方_L0064"
+   ],
+   [
+    "L0065  R01+R03",
+    "open_両方_L0065"
+   ],
+   [
+    "L0066  R01",
+    "open_両方_L0066"
+   ],
+   [
+    "L0068  R02+R03",
+    "open_両方_L0068"
+   ],
+   [
+    "L0069  R01",
+    "open_両方_L0069"
+   ],
+   [
+    "L0070  R02",
+    "open_両方_L0070"
+   ],
+   [
+    "L0071  R01",
+    "open_両方_L0071"
+   ],
+   [
+    "L0073  R01+R02+R03",
+    "open_両方_L0073"
+   ],
+   [
+    "L0074  R01+R02",
+    "open_両方_L0074"
+   ],
+   [
+    "L0075  R01+R02",
+    "open_両方_L0075"
+   ],
+   [
+    "L0076  R01+R02",
+    "open_両方_L0076"
+   ],
+   [
+    "L0077  R02",
+    "open_両方_L0077"
+   ],
+   [
+    "L0078  R01+R02",
+    "open_両方_L0078"
+   ],
+   [
+    "L0079  R01+R02",
+    "open_両方_L0079"
+   ],
+   [
+    "L0080  R01+R02",
+    "open_両方_L0080"
+   ],
+   [
+    "PT014  R05",
+    "open_両方_PT014"
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "R04〜R08 は判定クエリが未実装のため対象外です。比較方向（comparison）は rules シートの値を使います。",
+   "ロットを押すとタブ1 の CQ06 で根拠経路を開きます（変更前のみ → 確定の判定、両方・変更後のみ → what-if の判定）。「両方」で該当ルールが変わったロットは「← 変更前のルール」を併記します。",
+   "http://localhost:3030/kg"
+  ],
+  "code": [],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "当該サプライヤーの部品を消費した全ロットのうち、不良が報告されたロットの割合が閾値を超える場合、要注意とする。消費ロット数が最小標本数（min_denominator）未満の場合は判定不能（標本数不足）とする",
+     "minDenominator": "5",
+     "rule": "data:rule/R01",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "ロット製造開始日以前で最も新しい保全日から製造開始日までの日数が、設備の保全間隔（maint_interval_days）を超える場合、要注意とする。製造開始日以前の保全記録がない場合は判定不能とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R02",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "nan",
+     "thresholdUnit": "days(equipment)"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "description": "検査結果にNGが1件以上あるロットは出荷保留とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R03",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "代替検討",
+     "description": "評価（rating）が閾値未満のサプライヤーが供給する部品は代替候補検討の対象とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R04",
+     "ruleId": "R04",
+     "ruleName": "低評価サプライヤー",
+     "threshold": "3",
+     "thresholdUnit": "rating"
+    },
+    {
+     "comparison": "le",
+     "conclusion": "代替候補",
+     "description": "R04 に該当するサプライヤーが供給する部品について、同一規格（spec）かつ同一部品種別（part_type）の部品を供給する現行以外のサプライヤーのうち、その部品を消費した全ロットに対する不良ロットの割合が閾値以下のものを代替候補とする。消費ロット数が最小標本数（min_denominator）未満のサプライヤーは候補から除く",
+     "minDenominator": "5",
+     "rule": "data:rule/R05",
+     "ruleId": "R05",
+     "ruleName": "代替サプライヤー条件",
+     "threshold": "0.03",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "遅延リスク",
+     "description": "納期までの残日数が製造リードタイム未満で、対応ロットが未完了の場合は遅延リスクと判定する",
+     "minDenominator": "nan",
+     "rule": "data:rule/R06",
+     "ruleId": "R06",
+     "ruleName": "納期遅延リスク",
+     "threshold": "5",
+     "thresholdUnit": "days"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "設備起因疑い",
+     "description": "同一不良種別が同一設備で30日以内に2件以上発生した場合、設備起因を疑う",
+     "minDenominator": "nan",
+     "rule": "data:rule/R07",
+     "ruleId": "R07",
+     "ruleName": "設備起因疑い",
+     "threshold": "2",
+     "thresholdUnit": "count/30days"
+    },
+    {
+     "comparison": "nan",
+     "conclusion": "影響範囲",
+     "description": "重大度Highのクレームは、同一ロットを含む全出荷先を影響範囲とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R08",
+     "ruleId": "R08",
+     "ruleName": "影響範囲拡大",
+     "threshold": "High",
+     "thresholdUnit": "severity"
+    }
+   ],
+   [
+    {
+     "conclusion": "判定不能",
+     "ruleId": "R01",
+     "変更前": "20",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "要注意",
+     "ruleId": "R01",
+     "変更前": "53",
+     "変更後": "53"
+    },
+    {
+     "conclusion": "判定不能",
+     "ruleId": "R02",
+     "変更前": "18",
+     "変更後": "18"
+    },
+    {
+     "conclusion": "要注意",
+     "ruleId": "R02",
+     "変更前": "20",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "出荷保留",
+     "ruleId": "R03",
+     "変更前": "17",
+     "変更後": "17"
+    },
+    {
+     "conclusion": "代替候補",
+     "ruleId": "R05",
+     "変更前": "1",
+     "変更後": "1"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "ルールの閾値を変えて再判定し、判定が変わるロットを比べます。rules グラフは書き換えず、判定クエリの VALUES に値を差し込んで `urn:whatif:evidence` に書き込みます。",
+   "**変更前**: 確定（rules の閾値）　→　**変更後**: what-if（R01=0.05, R02 倍率=1.0, R03=1）",
+   "**変更前のみ**（0 ロット）",
+   "**両方**（64 ロット）",
+   "**変更後のみ**（0 ロット）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [
+   [
+    "判定ありロット（変更前）",
+    "64",
+    ""
+   ],
+   [
+    "判定ありロット（変更後）",
+    "64",
+    "0"
+   ]
+  ],
+  "radio": [],
+  "selectbox": [],
+  "state": {
+   "main_tabs": "閾値を変える",
+   "whatif": "R01=0.05, R02 倍率=1.0, R03=1"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "whatif_0.05_with_undetermined": {
+  "button": [
+   [
+    "再判定",
+    null
+   ],
+   [
+    "L0001  R01+R02",
+    "open_両方_L0001"
+   ],
+   [
+    "L0002  R01+R02",
+    "open_両方_L0002"
+   ],
+   [
+    "L0003  R01+R02+R03",
+    "open_両方_L0003"
+   ],
+   [
+    "L0004  R01",
+    "open_両方_L0004"
+   ],
+   [
+    "L0005  R01+R02+R03",
+    "open_両方_L0005"
+   ],
+   [
+    "L0006  R01+R02",
+    "open_両方_L0006"
+   ],
+   [
+    "L0007  R01",
+    "open_両方_L0007"
+   ],
+   [
+    "L0008  R01+R03",
+    "open_両方_L0008"
+   ],
+   [
+    "L0009  R01+R02+R03",
+    "open_両方_L0009"
+   ],
+   [
+    "L0010  R01+R02",
+    "open_両方_L0010"
+   ],
+   [
+    "L0011  R01+R02",
+    "open_両方_L0011"
+   ],
+   [
+    "L0012  R01+R02",
+    "open_両方_L0012"
+   ],
+   [
+    "L0013  R01+R03",
+    "open_両方_L0013"
+   ],
+   [
+    "L0014  R01+R02",
+    "open_両方_L0014"
+   ],
+   [
+    "L0015  R01",
+    "open_両方_L0015"
+   ],
+   [
+    "L0016  R01+R02",
+    "open_両方_L0016"
+   ],
+   [
+    "L0018  R01+R03",
+    "open_両方_L0018"
+   ],
+   [
+    "L0020  R01+R02",
+    "open_両方_L0020"
+   ],
+   [
+    "L0021  R01",
+    "open_両方_L0021"
+   ],
+   [
+    "L0022  R01",
+    "open_両方_L0022"
+   ],
+   [
+    "L0023  R01",
+    "open_両方_L0023"
+   ],
+   [
+    "L0024  R01+R02",
+    "open_両方_L0024"
+   ],
+   [
+    "L0026  R01+R02",
+    "open_両方_L0026"
+   ],
+   [
+    "L0028  R01+R03",
+    "open_両方_L0028"
+   ],
+   [
+    "L0029  R01",
+    "open_両方_L0029"
+   ],
+   [
+    "L0030  R01",
+    "open_両方_L0030"
+   ],
+   [
+    "L0031  R01",
+    "open_両方_L0031"
+   ],
+   [
+    "L0032  R01+R03",
+    "open_両方_L0032"
+   ],
+   [
+    "L0033  R01+R03",
+    "open_両方_L0033"
+   ],
+   [
+    "L0035  R01+R02",
+    "open_両方_L0035"
+   ],
+   [
+    "L0036  R01",
+    "open_両方_L0036"
+   ],
+   [
+    "L0037  R01",
+    "open_両方_L0037"
+   ],
+   [
+    "L0038  R01+R03",
+    "open_両方_L0038"
+   ],
+   [
+    "L0039  R01+R02",
+    "open_両方_L0039"
+   ],
+   [
+    "L0040  R01+R02",
+    "open_両方_L0040"
+   ],
+   [
+    "L0041  R01+R02+R03",
+    "open_両方_L0041"
+   ],
+   [
+    "L0042  R01",
+    "open_両方_L0042"
+   ],
+   [
+    "L0043  R01+R03",
+    "open_両方_L0043"
+   ],
+   [
+    "L0044  R01+R02",
+    "open_両方_L0044"
+   ],
+   [
+    "L0045  R01",
+    "open_両方_L0045"
+   ],
+   [
+    "L0046  R01",
+    "open_両方_L0046"
+   ],
+   [
+    "L0047  R01",
+    "open_両方_L0047"
+   ],
+   [
+    "L0048  R01+R02+R03",
+    "open_両方_L0048"
+   ],
+   [
+    "L0049  R01+R02",
+    "open_両方_L0049"
+   ],
+   [
+    "L0050  R01",
+    "open_両方_L0050"
+   ],
+   [
+    "L0051  R01",
+    "open_両方_L0051"
+   ],
+   [
+    "L0052  R01",
+    "open_両方_L0052"
+   ],
+   [
+    "L0053  R01+R02",
+    "open_両方_L0053"
+   ],
+   [
+    "L0054  R01",
+    "open_両方_L0054"
+   ],
+   [
+    "L0055  R01+R02",
+    "open_両方_L0055"
+   ],
+   [
+    "L0056  R01+R02",
+    "open_両方_L0056"
+   ],
+   [
+    "L0057  R01+R03",
+    "open_両方_L0057"
+   ],
+   [
+    "L0058  R01+R02",
+    "open_両方_L0058"
+   ],
+   [
+    "L0059  R01",
+    "open_両方_L0059"
+   ],
+   [
+    "L0060  R02",
+    "open_両方_L0060"
+   ],
+   [
+    "L0061  R01",
+    "open_両方_L0061"
+   ],
+   [
+    "L0062  R01",
+    "open_両方_L0062"
+   ],
+   [
+    "L0063  R01+R02",
+    "open_両方_L0063"
+   ],
+   [
+    "L0064  R01+R02",
+    "open_両方_L0064"
+   ],
+   [
+    "L0065  R01+R03",
+    "open_両方_L0065"
+   ],
+   [
+    "L0066  R01",
+    "open_両方_L0066"
+   ],
+   [
+    "L0068  R01+R02+R03",
+    "open_両方_L0068"
+   ],
+   [
+    "L0069  R01",
+    "open_両方_L0069"
+   ],
+   [
+    "L0070  R01+R02",
+    "open_両方_L0070"
+   ],
+   [
+    "L0071  R01",
+    "open_両方_L0071"
+   ],
+   [
+    "L0072  R01",
+    "open_両方_L0072"
+   ],
+   [
+    "L0073  R01+R02+R03",
+    "open_両方_L0073"
+   ],
+   [
+    "L0074  R01+R02",
+    "open_両方_L0074"
+   ],
+   [
+    "L0075  R01+R02",
+    "open_両方_L0075"
+   ],
+   [
+    "L0076  R01+R02",
+    "open_両方_L0076"
+   ],
+   [
+    "L0077  R01+R02",
+    "open_両方_L0077"
+   ],
+   [
+    "L0078  R01+R02",
+    "open_両方_L0078"
+   ],
+   [
+    "L0079  R01+R02",
+    "open_両方_L0079"
+   ],
+   [
+    "L0080  R01+R02",
+    "open_両方_L0080"
+   ],
+   [
+    "PT014  R05",
+    "open_両方_PT014"
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "R04〜R08 は判定クエリが未実装のため対象外です。比較方向（comparison）は rules シートの値を使います。",
+   "ロットを押すとタブ1 の CQ06 で根拠経路を開きます（変更前のみ → 確定の判定、両方・変更後のみ → what-if の判定）。「両方」で該当ルールが変わったロットは「← 変更前のルール」を併記します。",
+   "http://localhost:3030/kg"
+  ],
+  "code": [],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "当該サプライヤーの部品を消費した全ロットのうち、不良が報告されたロットの割合が閾値を超える場合、要注意とする。消費ロット数が最小標本数（min_denominator）未満の場合は判定不能（標本数不足）とする",
+     "minDenominator": "5",
+     "rule": "data:rule/R01",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "ロット製造開始日以前で最も新しい保全日から製造開始日までの日数が、設備の保全間隔（maint_interval_days）を超える場合、要注意とする。製造開始日以前の保全記録がない場合は判定不能とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R02",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "nan",
+     "thresholdUnit": "days(equipment)"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "description": "検査結果にNGが1件以上あるロットは出荷保留とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R03",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "代替検討",
+     "description": "評価（rating）が閾値未満のサプライヤーが供給する部品は代替候補検討の対象とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R04",
+     "ruleId": "R04",
+     "ruleName": "低評価サプライヤー",
+     "threshold": "3",
+     "thresholdUnit": "rating"
+    },
+    {
+     "comparison": "le",
+     "conclusion": "代替候補",
+     "description": "R04 に該当するサプライヤーが供給する部品について、同一規格（spec）かつ同一部品種別（part_type）の部品を供給する現行以外のサプライヤーのうち、その部品を消費した全ロットに対する不良ロットの割合が閾値以下のものを代替候補とする。消費ロット数が最小標本数（min_denominator）未満のサプライヤーは候補から除く",
+     "minDenominator": "5",
+     "rule": "data:rule/R05",
+     "ruleId": "R05",
+     "ruleName": "代替サプライヤー条件",
+     "threshold": "0.03",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "遅延リスク",
+     "description": "納期までの残日数が製造リードタイム未満で、対応ロットが未完了の場合は遅延リスクと判定する",
+     "minDenominator": "nan",
+     "rule": "data:rule/R06",
+     "ruleId": "R06",
+     "ruleName": "納期遅延リスク",
+     "threshold": "5",
+     "thresholdUnit": "days"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "設備起因疑い",
+     "description": "同一不良種別が同一設備で30日以内に2件以上発生した場合、設備起因を疑う",
+     "minDenominator": "nan",
+     "rule": "data:rule/R07",
+     "ruleId": "R07",
+     "ruleName": "設備起因疑い",
+     "threshold": "2",
+     "thresholdUnit": "count/30days"
+    },
+    {
+     "comparison": "nan",
+     "conclusion": "影響範囲",
+     "description": "重大度Highのクレームは、同一ロットを含む全出荷先を影響範囲とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R08",
+     "ruleId": "R08",
+     "ruleName": "影響範囲拡大",
+     "threshold": "High",
+     "thresholdUnit": "severity"
+    }
+   ],
+   [
+    {
+     "conclusion": "判定不能",
+     "ruleId": "R01",
+     "変更前": "20",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "要注意",
+     "ruleId": "R01",
+     "変更前": "53",
+     "変更後": "53"
+    },
+    {
+     "conclusion": "判定不能",
+     "ruleId": "R02",
+     "変更前": "18",
+     "変更後": "18"
+    },
+    {
+     "conclusion": "要注意",
+     "ruleId": "R02",
+     "変更前": "20",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "出荷保留",
+     "ruleId": "R03",
+     "変更前": "17",
+     "変更後": "17"
+    },
+    {
+     "conclusion": "代替候補",
+     "ruleId": "R05",
+     "変更前": "1",
+     "変更後": "1"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "ルールの閾値を変えて再判定し、判定が変わるロットを比べます。rules グラフは書き換えず、判定クエリの VALUES に値を差し込んで `urn:whatif:evidence` に書き込みます。",
+   "**変更前**: 確定（rules の閾値）　→　**変更後**: what-if（R01=0.05, R02 倍率=1.0, R03=1）",
+   "**変更前のみ**（0 ロット）",
+   "**両方**（75 ロット）",
+   "**変更後のみ**（0 ロット）",
+   ":green[●] 接続中",
+   "20 graphs  \n8,391 triples"
+  ],
+  "metric": [
+   [
+    "判定ありロット（変更前）",
+    "75",
+    ""
+   ],
+   [
+    "判定ありロット（変更後）",
+    "75",
+    "0"
+   ]
+  ],
+  "radio": [],
+  "selectbox": [],
+  "state": {
+   "main_tabs": "閾値を変える",
+   "whatif": "R01=0.05, R02 倍率=1.0, R03=1"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "whatif_0.3": {
+  "button": [
+   [
+    "再判定",
+    null
+   ],
+   [
+    "L0004  R01",
+    "open_変更前のみ_L0004"
+   ],
+   [
+    "L0006  R01",
+    "open_変更前のみ_L0006"
+   ],
+   [
+    "L0007  R01",
+    "open_変更前のみ_L0007"
+   ],
+   [
+    "L0010  R01",
+    "open_変更前のみ_L0010"
+   ],
+   [
+    "L0011  R01",
+    "open_変更前のみ_L0011"
+   ],
+   [
+    "L0015  R01",
+    "open_変更前のみ_L0015"
+   ],
+   [
+    "L0020  R01",
+    "open_変更前のみ_L0020"
+   ],
+   [
+    "L0026  R01",
+    "open_変更前のみ_L0026"
+   ],
+   [
+    "L0029  R01",
+    "open_変更前のみ_L0029"
+   ],
+   [
+    "L0030  R01",
+    "open_変更前のみ_L0030"
+   ],
+   [
+    "L0035  R01",
+    "open_変更前のみ_L0035"
+   ],
+   [
+    "L0036  R01",
+    "open_変更前のみ_L0036"
+   ],
+   [
+    "L0039  R01",
+    "open_変更前のみ_L0039"
+   ],
+   [
+    "L0045  R01",
+    "open_変更前のみ_L0045"
+   ],
+   [
+    "L0047  R01",
+    "open_変更前のみ_L0047"
+   ],
+   [
+    "L0050  R01",
+    "open_変更前のみ_L0050"
+   ],
+   [
+    "L0051  R01",
+    "open_変更前のみ_L0051"
+   ],
+   [
+    "L0052  R01",
+    "open_変更前のみ_L0052"
+   ],
+   [
+    "L0054  R01",
+    "open_変更前のみ_L0054"
+   ],
+   [
+    "L0062  R01",
+    "open_変更前のみ_L0062"
+   ],
+   [
+    "L0066  R01",
+    "open_変更前のみ_L0066"
+   ],
+   [
+    "L0069  R01",
+    "open_変更前のみ_L0069"
+   ],
+   [
+    "L0071  R01",
+    "open_変更前のみ_L0071"
+   ],
+   [
+    "L0001  R01",
+    "open_両方_L0001"
+   ],
+   [
+    "L0002  R01",
+    "open_両方_L0002"
+   ],
+   [
+    "L0003  R01+R03",
+    "open_両方_L0003"
+   ],
+   [
+    "L0005  R01+R03",
+    "open_両方_L0005"
+   ],
+   [
+    "L0008  R01+R03",
+    "open_両方_L0008"
+   ],
+   [
+    "L0009  R01+R03",
+    "open_両方_L0009"
+   ],
+   [
+    "L0013  R01+R03",
+    "open_両方_L0013"
+   ],
+   [
+    "L0016  R01",
+    "open_両方_L0016"
+   ],
+   [
+    "L0018  R03",
+    "open_両方_L0018"
+   ],
+   [
+    "L0023  R01",
+    "open_両方_L0023"
+   ],
+   [
+    "L0028  R01+R03",
+    "open_両方_L0028"
+   ],
+   [
+    "L0031  R01",
+    "open_両方_L0031"
+   ],
+   [
+    "L0032  R01+R03",
+    "open_両方_L0032"
+   ],
+   [
+    "L0033  R01+R03",
+    "open_両方_L0033"
+   ],
+   [
+    "L0037  R01",
+    "open_両方_L0037"
+   ],
+   [
+    "L0038  R03",
+    "open_両方_L0038"
+   ],
+   [
+    "L0040  R01+R02",
+    "open_両方_L0040"
+   ],
+   [
+    "L0041  R01+R03",
+    "open_両方_L0041"
+   ],
+   [
+    "L0043  R03 ← R01+R03",
+    "open_両方_L0043"
+   ],
+   [
+    "L0044  R02",
+    "open_両方_L0044"
+   ],
+   [
+    "L0048  R02+R03 ← R01+R02+R03",
+    "open_両方_L0048"
+   ],
+   [
+    "L0049  R02",
+    "open_両方_L0049"
+   ],
+   [
+    "L0053  R02 ← R01+R02",
+    "open_両方_L0053"
+   ],
+   [
+    "L0055  R02",
+    "open_両方_L0055"
+   ],
+   [
+    "L0057  R01+R03",
+    "open_両方_L0057"
+   ],
+   [
+    "L0058  R02",
+    "open_両方_L0058"
+   ],
+   [
+    "L0060  R02",
+    "open_両方_L0060"
+   ],
+   [
+    "L0063  R02 ← R01+R02",
+    "open_両方_L0063"
+   ],
+   [
+    "L0064  R01+R02",
+    "open_両方_L0064"
+   ],
+   [
+    "L0065  R03 ← R01+R03",
+    "open_両方_L0065"
+   ],
+   [
+    "L0068  R02+R03",
+    "open_両方_L0068"
+   ],
+   [
+    "L0070  R02",
+    "open_両方_L0070"
+   ],
+   [
+    "L0073  R01+R02+R03",
+    "open_両方_L0073"
+   ],
+   [
+    "L0074  R02 ← R01+R02",
+    "open_両方_L0074"
+   ],
+   [
+    "L0075  R01+R02",
+    "open_両方_L0075"
+   ],
+   [
+    "L0076  R02 ← R01+R02",
+    "open_両方_L0076"
+   ],
+   [
+    "L0077  R02",
+    "open_両方_L0077"
+   ],
+   [
+    "L0078  R02 ← R01+R02",
+    "open_両方_L0078"
+   ],
+   [
+    "L0079  R02 ← R01+R02",
+    "open_両方_L0079"
+   ],
+   [
+    "L0080  R02 ← R01+R02",
+    "open_両方_L0080"
+   ],
+   [
+    "PT014  R05",
+    "open_両方_PT014"
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "R04〜R08 は判定クエリが未実装のため対象外です。比較方向（comparison）は rules シートの値を使います。",
+   "ロットを押すとタブ1 の CQ06 で根拠経路を開きます（変更前のみ → 確定の判定、両方・変更後のみ → what-if の判定）。「両方」で該当ルールが変わったロットは「← 変更前のルール」を併記します。",
+   "http://localhost:3030/kg"
+  ],
+  "code": [],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "当該サプライヤーの部品を消費した全ロットのうち、不良が報告されたロットの割合が閾値を超える場合、要注意とする。消費ロット数が最小標本数（min_denominator）未満の場合は判定不能（標本数不足）とする",
+     "minDenominator": "5",
+     "rule": "data:rule/R01",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "ロット製造開始日以前で最も新しい保全日から製造開始日までの日数が、設備の保全間隔（maint_interval_days）を超える場合、要注意とする。製造開始日以前の保全記録がない場合は判定不能とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R02",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "nan",
+     "thresholdUnit": "days(equipment)"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "description": "検査結果にNGが1件以上あるロットは出荷保留とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R03",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "代替検討",
+     "description": "評価（rating）が閾値未満のサプライヤーが供給する部品は代替候補検討の対象とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R04",
+     "ruleId": "R04",
+     "ruleName": "低評価サプライヤー",
+     "threshold": "3",
+     "thresholdUnit": "rating"
+    },
+    {
+     "comparison": "le",
+     "conclusion": "代替候補",
+     "description": "R04 に該当するサプライヤーが供給する部品について、同一規格（spec）かつ同一部品種別（part_type）の部品を供給する現行以外のサプライヤーのうち、その部品を消費した全ロットに対する不良ロットの割合が閾値以下のものを代替候補とする。消費ロット数が最小標本数（min_denominator）未満のサプライヤーは候補から除く",
+     "minDenominator": "5",
+     "rule": "data:rule/R05",
+     "ruleId": "R05",
+     "ruleName": "代替サプライヤー条件",
+     "threshold": "0.03",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "遅延リスク",
+     "description": "納期までの残日数が製造リードタイム未満で、対応ロットが未完了の場合は遅延リスクと判定する",
+     "minDenominator": "nan",
+     "rule": "data:rule/R06",
+     "ruleId": "R06",
+     "ruleName": "納期遅延リスク",
+     "threshold": "5",
+     "thresholdUnit": "days"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "設備起因疑い",
+     "description": "同一不良種別が同一設備で30日以内に2件以上発生した場合、設備起因を疑う",
+     "minDenominator": "nan",
+     "rule": "data:rule/R07",
+     "ruleId": "R07",
+     "ruleName": "設備起因疑い",
+     "threshold": "2",
+     "thresholdUnit": "count/30days"
+    },
+    {
+     "comparison": "nan",
+     "conclusion": "影響範囲",
+     "description": "重大度Highのクレームは、同一ロットを含む全出荷先を影響範囲とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R08",
+     "ruleId": "R08",
+     "ruleName": "影響範囲拡大",
+     "threshold": "High",
+     "thresholdUnit": "severity"
+    }
+   ],
+   [
+    {
+     "conclusion": "判定不能",
+     "ruleId": "R01",
+     "変更前": "20",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "要注意",
+     "ruleId": "R01",
+     "変更前": "53",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "判定不能",
+     "ruleId": "R02",
+     "変更前": "18",
+     "変更後": "18"
+    },
+    {
+     "conclusion": "要注意",
+     "ruleId": "R02",
+     "変更前": "20",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "出荷保留",
+     "ruleId": "R03",
+     "変更前": "17",
+     "変更後": "17"
+    },
+    {
+     "conclusion": "代替候補",
+     "ruleId": "R05",
+     "変更前": "1",
+     "変更後": "1"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "ルールの閾値を変えて再判定し、判定が変わるロットを比べます。rules グラフは書き換えず、判定クエリの VALUES に値を差し込んで `urn:whatif:evidence` に書き込みます。",
+   "**変更前**: 確定（rules の閾値）　→　**変更後**: what-if（R01=0.30, R02 倍率=1.0, R03=1）",
+   "**変更前のみ**（23 ロット）",
+   "**両方**（41 ロット）",
+   "**変更後のみ**（0 ロット）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [
+   [
+    "判定ありロット（変更前）",
+    "64",
+    ""
+   ],
+   [
+    "判定ありロット（変更後）",
+    "41",
+    "-23"
+   ]
+  ],
+  "radio": [],
+  "selectbox": [],
+  "state": {
+   "main_tabs": "閾値を変える",
+   "whatif": "R01=0.30, R02 倍率=1.0, R03=1"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "whatif_0.3_with_undetermined": {
+  "button": [
+   [
+    "再判定",
+    null
+   ],
+   [
+    "L0004  R01",
+    "open_変更前のみ_L0004"
+   ],
+   [
+    "L0007  R01",
+    "open_変更前のみ_L0007"
+   ],
+   [
+    "L0015  R01",
+    "open_変更前のみ_L0015"
+   ],
+   [
+    "L0029  R01",
+    "open_変更前のみ_L0029"
+   ],
+   [
+    "L0030  R01",
+    "open_変更前のみ_L0030"
+   ],
+   [
+    "L0036  R01",
+    "open_変更前のみ_L0036"
+   ],
+   [
+    "L0045  R01",
+    "open_変更前のみ_L0045"
+   ],
+   [
+    "L0047  R01",
+    "open_変更前のみ_L0047"
+   ],
+   [
+    "L0050  R01",
+    "open_変更前のみ_L0050"
+   ],
+   [
+    "L0051  R01",
+    "open_変更前のみ_L0051"
+   ],
+   [
+    "L0052  R01",
+    "open_変更前のみ_L0052"
+   ],
+   [
+    "L0054  R01",
+    "open_変更前のみ_L0054"
+   ],
+   [
+    "L0062  R01",
+    "open_変更前のみ_L0062"
+   ],
+   [
+    "L0066  R01",
+    "open_変更前のみ_L0066"
+   ],
+   [
+    "L0069  R01",
+    "open_変更前のみ_L0069"
+   ],
+   [
+    "L0071  R01",
+    "open_変更前のみ_L0071"
+   ],
+   [
+    "L0001  R01+R02",
+    "open_両方_L0001"
+   ],
+   [
+    "L0002  R01+R02",
+    "open_両方_L0002"
+   ],
+   [
+    "L0003  R01+R02+R03",
+    "open_両方_L0003"
+   ],
+   [
+    "L0005  R01+R02+R03",
+    "open_両方_L0005"
+   ],
+   [
+    "L0006  R02 ← R01+R02",
+    "open_両方_L0006"
+   ],
+   [
+    "L0008  R01+R03",
+    "open_両方_L0008"
+   ],
+   [
+    "L0009  R01+R02+R03",
+    "open_両方_L0009"
+   ],
+   [
+    "L0010  R02 ← R01+R02",
+    "open_両方_L0010"
+   ],
+   [
+    "L0011  R02 ← R01+R02",
+    "open_両方_L0011"
+   ],
+   [
+    "L0012  R01+R02",
+    "open_両方_L0012"
+   ],
+   [
+    "L0013  R01+R03",
+    "open_両方_L0013"
+   ],
+   [
+    "L0014  R01+R02",
+    "open_両方_L0014"
+   ],
+   [
+    "L0016  R01+R02",
+    "open_両方_L0016"
+   ],
+   [
+    "L0018  R01+R03",
+    "open_両方_L0018"
+   ],
+   [
+    "L0020  R02 ← R01+R02",
+    "open_両方_L0020"
+   ],
+   [
+    "L0021  R01",
+    "open_両方_L0021"
+   ],
+   [
+    "L0022  R01",
+    "open_両方_L0022"
+   ],
+   [
+    "L0023  R01",
+    "open_両方_L0023"
+   ],
+   [
+    "L0024  R01+R02",
+    "open_両方_L0024"
+   ],
+   [
+    "L0026  R02 ← R01+R02",
+    "open_両方_L0026"
+   ],
+   [
+    "L0028  R01+R03",
+    "open_両方_L0028"
+   ],
+   [
+    "L0031  R01",
+    "open_両方_L0031"
+   ],
+   [
+    "L0032  R01+R03",
+    "open_両方_L0032"
+   ],
+   [
+    "L0033  R01+R03",
+    "open_両方_L0033"
+   ],
+   [
+    "L0035  R02 ← R01+R02",
+    "open_両方_L0035"
+   ],
+   [
+    "L0037  R01",
+    "open_両方_L0037"
+   ],
+   [
+    "L0038  R01+R03",
+    "open_両方_L0038"
+   ],
+   [
+    "L0039  R02 ← R01+R02",
+    "open_両方_L0039"
+   ],
+   [
+    "L0040  R01+R02",
+    "open_両方_L0040"
+   ],
+   [
+    "L0041  R01+R02+R03",
+    "open_両方_L0041"
+   ],
+   [
+    "L0042  R01",
+    "open_両方_L0042"
+   ],
+   [
+    "L0043  R03 ← R01+R03",
+    "open_両方_L0043"
+   ],
+   [
+    "L0044  R01+R02",
+    "open_両方_L0044"
+   ],
+   [
+    "L0046  R01",
+    "open_両方_L0046"
+   ],
+   [
+    "L0048  R02+R03 ← R01+R02+R03",
+    "open_両方_L0048"
+   ],
+   [
+    "L0049  R01+R02",
+    "open_両方_L0049"
+   ],
+   [
+    "L0053  R02 ← R01+R02",
+    "open_両方_L0053"
+   ],
+   [
+    "L0055  R01+R02",
+    "open_両方_L0055"
+   ],
+   [
+    "L0056  R01+R02",
+    "open_両方_L0056"
+   ],
+   [
+    "L0057  R01+R03",
+    "open_両方_L0057"
+   ],
+   [
+    "L0058  R01+R02",
+    "open_両方_L0058"
+   ],
+   [
+    "L0059  R01",
+    "open_両方_L0059"
+   ],
+   [
+    "L0060  R02",
+    "open_両方_L0060"
+   ],
+   [
+    "L0061  R01",
+    "open_両方_L0061"
+   ],
+   [
+    "L0063  R02 ← R01+R02",
+    "open_両方_L0063"
+   ],
+   [
+    "L0064  R01+R02",
+    "open_両方_L0064"
+   ],
+   [
+    "L0065  R03 ← R01+R03",
+    "open_両方_L0065"
+   ],
+   [
+    "L0068  R01+R02+R03",
+    "open_両方_L0068"
+   ],
+   [
+    "L0070  R01+R02",
+    "open_両方_L0070"
+   ],
+   [
+    "L0072  R01",
+    "open_両方_L0072"
+   ],
+   [
+    "L0073  R01+R02+R03",
+    "open_両方_L0073"
+   ],
+   [
+    "L0074  R02 ← R01+R02",
+    "open_両方_L0074"
+   ],
+   [
+    "L0075  R01+R02",
+    "open_両方_L0075"
+   ],
+   [
+    "L0076  R02 ← R01+R02",
+    "open_両方_L0076"
+   ],
+   [
+    "L0077  R01+R02",
+    "open_両方_L0077"
+   ],
+   [
+    "L0078  R02 ← R01+R02",
+    "open_両方_L0078"
+   ],
+   [
+    "L0079  R02 ← R01+R02",
+    "open_両方_L0079"
+   ],
+   [
+    "L0080  R02 ← R01+R02",
+    "open_両方_L0080"
+   ],
+   [
+    "PT014  R05",
+    "open_両方_PT014"
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "R04〜R08 は判定クエリが未実装のため対象外です。比較方向（comparison）は rules シートの値を使います。",
+   "ロットを押すとタブ1 の CQ06 で根拠経路を開きます（変更前のみ → 確定の判定、両方・変更後のみ → what-if の判定）。「両方」で該当ルールが変わったロットは「← 変更前のルール」を併記します。",
+   "http://localhost:3030/kg"
+  ],
+  "code": [],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "当該サプライヤーの部品を消費した全ロットのうち、不良が報告されたロットの割合が閾値を超える場合、要注意とする。消費ロット数が最小標本数（min_denominator）未満の場合は判定不能（標本数不足）とする",
+     "minDenominator": "5",
+     "rule": "data:rule/R01",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "ロット製造開始日以前で最も新しい保全日から製造開始日までの日数が、設備の保全間隔（maint_interval_days）を超える場合、要注意とする。製造開始日以前の保全記録がない場合は判定不能とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R02",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "nan",
+     "thresholdUnit": "days(equipment)"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "description": "検査結果にNGが1件以上あるロットは出荷保留とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R03",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "代替検討",
+     "description": "評価（rating）が閾値未満のサプライヤーが供給する部品は代替候補検討の対象とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R04",
+     "ruleId": "R04",
+     "ruleName": "低評価サプライヤー",
+     "threshold": "3",
+     "thresholdUnit": "rating"
+    },
+    {
+     "comparison": "le",
+     "conclusion": "代替候補",
+     "description": "R04 に該当するサプライヤーが供給する部品について、同一規格（spec）かつ同一部品種別（part_type）の部品を供給する現行以外のサプライヤーのうち、その部品を消費した全ロットに対する不良ロットの割合が閾値以下のものを代替候補とする。消費ロット数が最小標本数（min_denominator）未満のサプライヤーは候補から除く",
+     "minDenominator": "5",
+     "rule": "data:rule/R05",
+     "ruleId": "R05",
+     "ruleName": "代替サプライヤー条件",
+     "threshold": "0.03",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "遅延リスク",
+     "description": "納期までの残日数が製造リードタイム未満で、対応ロットが未完了の場合は遅延リスクと判定する",
+     "minDenominator": "nan",
+     "rule": "data:rule/R06",
+     "ruleId": "R06",
+     "ruleName": "納期遅延リスク",
+     "threshold": "5",
+     "thresholdUnit": "days"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "設備起因疑い",
+     "description": "同一不良種別が同一設備で30日以内に2件以上発生した場合、設備起因を疑う",
+     "minDenominator": "nan",
+     "rule": "data:rule/R07",
+     "ruleId": "R07",
+     "ruleName": "設備起因疑い",
+     "threshold": "2",
+     "thresholdUnit": "count/30days"
+    },
+    {
+     "comparison": "nan",
+     "conclusion": "影響範囲",
+     "description": "重大度Highのクレームは、同一ロットを含む全出荷先を影響範囲とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R08",
+     "ruleId": "R08",
+     "ruleName": "影響範囲拡大",
+     "threshold": "High",
+     "thresholdUnit": "severity"
+    }
+   ],
+   [
+    {
+     "conclusion": "判定不能",
+     "ruleId": "R01",
+     "変更前": "20",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "要注意",
+     "ruleId": "R01",
+     "変更前": "53",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "判定不能",
+     "ruleId": "R02",
+     "変更前": "18",
+     "変更後": "18"
+    },
+    {
+     "conclusion": "要注意",
+     "ruleId": "R02",
+     "変更前": "20",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "出荷保留",
+     "ruleId": "R03",
+     "変更前": "17",
+     "変更後": "17"
+    },
+    {
+     "conclusion": "代替候補",
+     "ruleId": "R05",
+     "変更前": "1",
+     "変更後": "1"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "ルールの閾値を変えて再判定し、判定が変わるロットを比べます。rules グラフは書き換えず、判定クエリの VALUES に値を差し込んで `urn:whatif:evidence` に書き込みます。",
+   "**変更前**: 確定（rules の閾値）　→　**変更後**: what-if（R01=0.30, R02 倍率=1.0, R03=1）",
+   "**変更前のみ**（16 ロット）",
+   "**両方**（59 ロット）",
+   "**変更後のみ**（0 ロット）",
+   ":green[●] 接続中",
+   "20 graphs  \n7,995 triples"
+  ],
+  "metric": [
+   [
+    "判定ありロット（変更前）",
+    "75",
+    ""
+   ],
+   [
+    "判定ありロット（変更後）",
+    "59",
+    "-16"
+   ]
+  ],
+  "radio": [],
+  "selectbox": [],
+  "state": {
+   "main_tabs": "閾値を変える",
+   "whatif": "R01=0.30, R02 倍率=1.0, R03=1"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "whatif_0.5": {
+  "button": [
+   [
+    "再判定",
+    null
+   ],
+   [
+    "L0004  R01",
+    "open_変更前のみ_L0004"
+   ],
+   [
+    "L0006  R01",
+    "open_変更前のみ_L0006"
+   ],
+   [
+    "L0007  R01",
+    "open_変更前のみ_L0007"
+   ],
+   [
+    "L0010  R01",
+    "open_変更前のみ_L0010"
+   ],
+   [
+    "L0011  R01",
+    "open_変更前のみ_L0011"
+   ],
+   [
+    "L0015  R01",
+    "open_変更前のみ_L0015"
+   ],
+   [
+    "L0020  R01",
+    "open_変更前のみ_L0020"
+   ],
+   [
+    "L0026  R01",
+    "open_変更前のみ_L0026"
+   ],
+   [
+    "L0029  R01",
+    "open_変更前のみ_L0029"
+   ],
+   [
+    "L0030  R01",
+    "open_変更前のみ_L0030"
+   ],
+   [
+    "L0035  R01",
+    "open_変更前のみ_L0035"
+   ],
+   [
+    "L0036  R01",
+    "open_変更前のみ_L0036"
+   ],
+   [
+    "L0039  R01",
+    "open_変更前のみ_L0039"
+   ],
+   [
+    "L0045  R01",
+    "open_変更前のみ_L0045"
+   ],
+   [
+    "L0047  R01",
+    "open_変更前のみ_L0047"
+   ],
+   [
+    "L0050  R01",
+    "open_変更前のみ_L0050"
+   ],
+   [
+    "L0051  R01",
+    "open_変更前のみ_L0051"
+   ],
+   [
+    "L0052  R01",
+    "open_変更前のみ_L0052"
+   ],
+   [
+    "L0054  R01",
+    "open_変更前のみ_L0054"
+   ],
+   [
+    "L0062  R01",
+    "open_変更前のみ_L0062"
+   ],
+   [
+    "L0066  R01",
+    "open_変更前のみ_L0066"
+   ],
+   [
+    "L0069  R01",
+    "open_変更前のみ_L0069"
+   ],
+   [
+    "L0071  R01",
+    "open_変更前のみ_L0071"
+   ],
+   [
+    "L0001  R01",
+    "open_両方_L0001"
+   ],
+   [
+    "L0002  R01",
+    "open_両方_L0002"
+   ],
+   [
+    "L0003  R01+R03",
+    "open_両方_L0003"
+   ],
+   [
+    "L0005  R01+R03",
+    "open_両方_L0005"
+   ],
+   [
+    "L0008  R01+R03",
+    "open_両方_L0008"
+   ],
+   [
+    "L0009  R01+R03",
+    "open_両方_L0009"
+   ],
+   [
+    "L0013  R01+R03",
+    "open_両方_L0013"
+   ],
+   [
+    "L0016  R01",
+    "open_両方_L0016"
+   ],
+   [
+    "L0018  R03",
+    "open_両方_L0018"
+   ],
+   [
+    "L0023  R01",
+    "open_両方_L0023"
+   ],
+   [
+    "L0028  R01+R03",
+    "open_両方_L0028"
+   ],
+   [
+    "L0031  R01",
+    "open_両方_L0031"
+   ],
+   [
+    "L0032  R01+R03",
+    "open_両方_L0032"
+   ],
+   [
+    "L0033  R01+R03",
+    "open_両方_L0033"
+   ],
+   [
+    "L0037  R01",
+    "open_両方_L0037"
+   ],
+   [
+    "L0038  R03",
+    "open_両方_L0038"
+   ],
+   [
+    "L0040  R01+R02",
+    "open_両方_L0040"
+   ],
+   [
+    "L0041  R01+R03",
+    "open_両方_L0041"
+   ],
+   [
+    "L0043  R03 ← R01+R03",
+    "open_両方_L0043"
+   ],
+   [
+    "L0044  R02",
+    "open_両方_L0044"
+   ],
+   [
+    "L0048  R02+R03 ← R01+R02+R03",
+    "open_両方_L0048"
+   ],
+   [
+    "L0049  R02",
+    "open_両方_L0049"
+   ],
+   [
+    "L0053  R02 ← R01+R02",
+    "open_両方_L0053"
+   ],
+   [
+    "L0055  R02",
+    "open_両方_L0055"
+   ],
+   [
+    "L0057  R01+R03",
+    "open_両方_L0057"
+   ],
+   [
+    "L0058  R02",
+    "open_両方_L0058"
+   ],
+   [
+    "L0060  R02",
+    "open_両方_L0060"
+   ],
+   [
+    "L0063  R02 ← R01+R02",
+    "open_両方_L0063"
+   ],
+   [
+    "L0064  R01+R02",
+    "open_両方_L0064"
+   ],
+   [
+    "L0065  R03 ← R01+R03",
+    "open_両方_L0065"
+   ],
+   [
+    "L0068  R02+R03",
+    "open_両方_L0068"
+   ],
+   [
+    "L0070  R02",
+    "open_両方_L0070"
+   ],
+   [
+    "L0073  R01+R02+R03",
+    "open_両方_L0073"
+   ],
+   [
+    "L0074  R02 ← R01+R02",
+    "open_両方_L0074"
+   ],
+   [
+    "L0075  R01+R02",
+    "open_両方_L0075"
+   ],
+   [
+    "L0076  R02 ← R01+R02",
+    "open_両方_L0076"
+   ],
+   [
+    "L0077  R02",
+    "open_両方_L0077"
+   ],
+   [
+    "L0078  R02 ← R01+R02",
+    "open_両方_L0078"
+   ],
+   [
+    "L0079  R02 ← R01+R02",
+    "open_両方_L0079"
+   ],
+   [
+    "L0080  R02 ← R01+R02",
+    "open_両方_L0080"
+   ],
+   [
+    "PT014  R05",
+    "open_両方_PT014"
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "R04〜R08 は判定クエリが未実装のため対象外です。比較方向（comparison）は rules シートの値を使います。",
+   "ロットを押すとタブ1 の CQ06 で根拠経路を開きます（変更前のみ → 確定の判定、両方・変更後のみ → what-if の判定）。「両方」で該当ルールが変わったロットは「← 変更前のルール」を併記します。",
+   "http://localhost:3030/kg"
+  ],
+  "code": [],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "当該サプライヤーの部品を消費した全ロットのうち、不良が報告されたロットの割合が閾値を超える場合、要注意とする。消費ロット数が最小標本数（min_denominator）未満の場合は判定不能（標本数不足）とする",
+     "minDenominator": "5",
+     "rule": "data:rule/R01",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "ロット製造開始日以前で最も新しい保全日から製造開始日までの日数が、設備の保全間隔（maint_interval_days）を超える場合、要注意とする。製造開始日以前の保全記録がない場合は判定不能とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R02",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "nan",
+     "thresholdUnit": "days(equipment)"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "description": "検査結果にNGが1件以上あるロットは出荷保留とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R03",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "代替検討",
+     "description": "評価（rating）が閾値未満のサプライヤーが供給する部品は代替候補検討の対象とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R04",
+     "ruleId": "R04",
+     "ruleName": "低評価サプライヤー",
+     "threshold": "3",
+     "thresholdUnit": "rating"
+    },
+    {
+     "comparison": "le",
+     "conclusion": "代替候補",
+     "description": "R04 に該当するサプライヤーが供給する部品について、同一規格（spec）かつ同一部品種別（part_type）の部品を供給する現行以外のサプライヤーのうち、その部品を消費した全ロットに対する不良ロットの割合が閾値以下のものを代替候補とする。消費ロット数が最小標本数（min_denominator）未満のサプライヤーは候補から除く",
+     "minDenominator": "5",
+     "rule": "data:rule/R05",
+     "ruleId": "R05",
+     "ruleName": "代替サプライヤー条件",
+     "threshold": "0.03",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "遅延リスク",
+     "description": "納期までの残日数が製造リードタイム未満で、対応ロットが未完了の場合は遅延リスクと判定する",
+     "minDenominator": "nan",
+     "rule": "data:rule/R06",
+     "ruleId": "R06",
+     "ruleName": "納期遅延リスク",
+     "threshold": "5",
+     "thresholdUnit": "days"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "設備起因疑い",
+     "description": "同一不良種別が同一設備で30日以内に2件以上発生した場合、設備起因を疑う",
+     "minDenominator": "nan",
+     "rule": "data:rule/R07",
+     "ruleId": "R07",
+     "ruleName": "設備起因疑い",
+     "threshold": "2",
+     "thresholdUnit": "count/30days"
+    },
+    {
+     "comparison": "nan",
+     "conclusion": "影響範囲",
+     "description": "重大度Highのクレームは、同一ロットを含む全出荷先を影響範囲とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R08",
+     "ruleId": "R08",
+     "ruleName": "影響範囲拡大",
+     "threshold": "High",
+     "thresholdUnit": "severity"
+    }
+   ],
+   [
+    {
+     "conclusion": "判定不能",
+     "ruleId": "R01",
+     "変更前": "20",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "要注意",
+     "ruleId": "R01",
+     "変更前": "53",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "判定不能",
+     "ruleId": "R02",
+     "変更前": "18",
+     "変更後": "18"
+    },
+    {
+     "conclusion": "要注意",
+     "ruleId": "R02",
+     "変更前": "20",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "出荷保留",
+     "ruleId": "R03",
+     "変更前": "17",
+     "変更後": "17"
+    },
+    {
+     "conclusion": "代替候補",
+     "ruleId": "R05",
+     "変更前": "1",
+     "変更後": "1"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "ルールの閾値を変えて再判定し、判定が変わるロットを比べます。rules グラフは書き換えず、判定クエリの VALUES に値を差し込んで `urn:whatif:evidence` に書き込みます。",
+   "**変更前**: 確定（rules の閾値）　→　**変更後**: what-if（R01=0.50, R02 倍率=1.0, R03=1）",
+   "**変更前のみ**（23 ロット）",
+   "**両方**（41 ロット）",
+   "**変更後のみ**（0 ロット）",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [
+   [
+    "判定ありロット（変更前）",
+    "64",
+    ""
+   ],
+   [
+    "判定ありロット（変更後）",
+    "41",
+    "-23"
+   ]
+  ],
+  "radio": [],
+  "selectbox": [],
+  "state": {
+   "main_tabs": "閾値を変える",
+   "whatif": "R01=0.50, R02 倍率=1.0, R03=1"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "whatif_0.5_with_undetermined": {
+  "button": [
+   [
+    "再判定",
+    null
+   ],
+   [
+    "L0004  R01",
+    "open_変更前のみ_L0004"
+   ],
+   [
+    "L0007  R01",
+    "open_変更前のみ_L0007"
+   ],
+   [
+    "L0015  R01",
+    "open_変更前のみ_L0015"
+   ],
+   [
+    "L0029  R01",
+    "open_変更前のみ_L0029"
+   ],
+   [
+    "L0030  R01",
+    "open_変更前のみ_L0030"
+   ],
+   [
+    "L0036  R01",
+    "open_変更前のみ_L0036"
+   ],
+   [
+    "L0045  R01",
+    "open_変更前のみ_L0045"
+   ],
+   [
+    "L0047  R01",
+    "open_変更前のみ_L0047"
+   ],
+   [
+    "L0050  R01",
+    "open_変更前のみ_L0050"
+   ],
+   [
+    "L0051  R01",
+    "open_変更前のみ_L0051"
+   ],
+   [
+    "L0052  R01",
+    "open_変更前のみ_L0052"
+   ],
+   [
+    "L0054  R01",
+    "open_変更前のみ_L0054"
+   ],
+   [
+    "L0062  R01",
+    "open_変更前のみ_L0062"
+   ],
+   [
+    "L0066  R01",
+    "open_変更前のみ_L0066"
+   ],
+   [
+    "L0069  R01",
+    "open_変更前のみ_L0069"
+   ],
+   [
+    "L0071  R01",
+    "open_変更前のみ_L0071"
+   ],
+   [
+    "L0001  R01+R02",
+    "open_両方_L0001"
+   ],
+   [
+    "L0002  R01+R02",
+    "open_両方_L0002"
+   ],
+   [
+    "L0003  R01+R02+R03",
+    "open_両方_L0003"
+   ],
+   [
+    "L0005  R01+R02+R03",
+    "open_両方_L0005"
+   ],
+   [
+    "L0006  R02 ← R01+R02",
+    "open_両方_L0006"
+   ],
+   [
+    "L0008  R01+R03",
+    "open_両方_L0008"
+   ],
+   [
+    "L0009  R01+R02+R03",
+    "open_両方_L0009"
+   ],
+   [
+    "L0010  R02 ← R01+R02",
+    "open_両方_L0010"
+   ],
+   [
+    "L0011  R02 ← R01+R02",
+    "open_両方_L0011"
+   ],
+   [
+    "L0012  R01+R02",
+    "open_両方_L0012"
+   ],
+   [
+    "L0013  R01+R03",
+    "open_両方_L0013"
+   ],
+   [
+    "L0014  R01+R02",
+    "open_両方_L0014"
+   ],
+   [
+    "L0016  R01+R02",
+    "open_両方_L0016"
+   ],
+   [
+    "L0018  R01+R03",
+    "open_両方_L0018"
+   ],
+   [
+    "L0020  R02 ← R01+R02",
+    "open_両方_L0020"
+   ],
+   [
+    "L0021  R01",
+    "open_両方_L0021"
+   ],
+   [
+    "L0022  R01",
+    "open_両方_L0022"
+   ],
+   [
+    "L0023  R01",
+    "open_両方_L0023"
+   ],
+   [
+    "L0024  R01+R02",
+    "open_両方_L0024"
+   ],
+   [
+    "L0026  R02 ← R01+R02",
+    "open_両方_L0026"
+   ],
+   [
+    "L0028  R01+R03",
+    "open_両方_L0028"
+   ],
+   [
+    "L0031  R01",
+    "open_両方_L0031"
+   ],
+   [
+    "L0032  R01+R03",
+    "open_両方_L0032"
+   ],
+   [
+    "L0033  R01+R03",
+    "open_両方_L0033"
+   ],
+   [
+    "L0035  R02 ← R01+R02",
+    "open_両方_L0035"
+   ],
+   [
+    "L0037  R01",
+    "open_両方_L0037"
+   ],
+   [
+    "L0038  R01+R03",
+    "open_両方_L0038"
+   ],
+   [
+    "L0039  R02 ← R01+R02",
+    "open_両方_L0039"
+   ],
+   [
+    "L0040  R01+R02",
+    "open_両方_L0040"
+   ],
+   [
+    "L0041  R01+R02+R03",
+    "open_両方_L0041"
+   ],
+   [
+    "L0042  R01",
+    "open_両方_L0042"
+   ],
+   [
+    "L0043  R03 ← R01+R03",
+    "open_両方_L0043"
+   ],
+   [
+    "L0044  R01+R02",
+    "open_両方_L0044"
+   ],
+   [
+    "L0046  R01",
+    "open_両方_L0046"
+   ],
+   [
+    "L0048  R02+R03 ← R01+R02+R03",
+    "open_両方_L0048"
+   ],
+   [
+    "L0049  R01+R02",
+    "open_両方_L0049"
+   ],
+   [
+    "L0053  R02 ← R01+R02",
+    "open_両方_L0053"
+   ],
+   [
+    "L0055  R01+R02",
+    "open_両方_L0055"
+   ],
+   [
+    "L0056  R01+R02",
+    "open_両方_L0056"
+   ],
+   [
+    "L0057  R01+R03",
+    "open_両方_L0057"
+   ],
+   [
+    "L0058  R01+R02",
+    "open_両方_L0058"
+   ],
+   [
+    "L0059  R01",
+    "open_両方_L0059"
+   ],
+   [
+    "L0060  R02",
+    "open_両方_L0060"
+   ],
+   [
+    "L0061  R01",
+    "open_両方_L0061"
+   ],
+   [
+    "L0063  R02 ← R01+R02",
+    "open_両方_L0063"
+   ],
+   [
+    "L0064  R01+R02",
+    "open_両方_L0064"
+   ],
+   [
+    "L0065  R03 ← R01+R03",
+    "open_両方_L0065"
+   ],
+   [
+    "L0068  R01+R02+R03",
+    "open_両方_L0068"
+   ],
+   [
+    "L0070  R01+R02",
+    "open_両方_L0070"
+   ],
+   [
+    "L0072  R01",
+    "open_両方_L0072"
+   ],
+   [
+    "L0073  R01+R02+R03",
+    "open_両方_L0073"
+   ],
+   [
+    "L0074  R02 ← R01+R02",
+    "open_両方_L0074"
+   ],
+   [
+    "L0075  R01+R02",
+    "open_両方_L0075"
+   ],
+   [
+    "L0076  R02 ← R01+R02",
+    "open_両方_L0076"
+   ],
+   [
+    "L0077  R01+R02",
+    "open_両方_L0077"
+   ],
+   [
+    "L0078  R02 ← R01+R02",
+    "open_両方_L0078"
+   ],
+   [
+    "L0079  R02 ← R01+R02",
+    "open_両方_L0079"
+   ],
+   [
+    "L0080  R02 ← R01+R02",
+    "open_両方_L0080"
+   ],
+   [
+    "PT014  R05",
+    "open_両方_PT014"
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "R04〜R08 は判定クエリが未実装のため対象外です。比較方向（comparison）は rules シートの値を使います。",
+   "ロットを押すとタブ1 の CQ06 で根拠経路を開きます（変更前のみ → 確定の判定、両方・変更後のみ → what-if の判定）。「両方」で該当ルールが変わったロットは「← 変更前のルール」を併記します。",
+   "http://localhost:3030/kg"
+  ],
+  "code": [],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "当該サプライヤーの部品を消費した全ロットのうち、不良が報告されたロットの割合が閾値を超える場合、要注意とする。消費ロット数が最小標本数（min_denominator）未満の場合は判定不能（標本数不足）とする",
+     "minDenominator": "5",
+     "rule": "data:rule/R01",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "ロット製造開始日以前で最も新しい保全日から製造開始日までの日数が、設備の保全間隔（maint_interval_days）を超える場合、要注意とする。製造開始日以前の保全記録がない場合は判定不能とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R02",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "nan",
+     "thresholdUnit": "days(equipment)"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "description": "検査結果にNGが1件以上あるロットは出荷保留とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R03",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "代替検討",
+     "description": "評価（rating）が閾値未満のサプライヤーが供給する部品は代替候補検討の対象とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R04",
+     "ruleId": "R04",
+     "ruleName": "低評価サプライヤー",
+     "threshold": "3",
+     "thresholdUnit": "rating"
+    },
+    {
+     "comparison": "le",
+     "conclusion": "代替候補",
+     "description": "R04 に該当するサプライヤーが供給する部品について、同一規格（spec）かつ同一部品種別（part_type）の部品を供給する現行以外のサプライヤーのうち、その部品を消費した全ロットに対する不良ロットの割合が閾値以下のものを代替候補とする。消費ロット数が最小標本数（min_denominator）未満のサプライヤーは候補から除く",
+     "minDenominator": "5",
+     "rule": "data:rule/R05",
+     "ruleId": "R05",
+     "ruleName": "代替サプライヤー条件",
+     "threshold": "0.03",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "遅延リスク",
+     "description": "納期までの残日数が製造リードタイム未満で、対応ロットが未完了の場合は遅延リスクと判定する",
+     "minDenominator": "nan",
+     "rule": "data:rule/R06",
+     "ruleId": "R06",
+     "ruleName": "納期遅延リスク",
+     "threshold": "5",
+     "thresholdUnit": "days"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "設備起因疑い",
+     "description": "同一不良種別が同一設備で30日以内に2件以上発生した場合、設備起因を疑う",
+     "minDenominator": "nan",
+     "rule": "data:rule/R07",
+     "ruleId": "R07",
+     "ruleName": "設備起因疑い",
+     "threshold": "2",
+     "thresholdUnit": "count/30days"
+    },
+    {
+     "comparison": "nan",
+     "conclusion": "影響範囲",
+     "description": "重大度Highのクレームは、同一ロットを含む全出荷先を影響範囲とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R08",
+     "ruleId": "R08",
+     "ruleName": "影響範囲拡大",
+     "threshold": "High",
+     "thresholdUnit": "severity"
+    }
+   ],
+   [
+    {
+     "conclusion": "判定不能",
+     "ruleId": "R01",
+     "変更前": "20",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "要注意",
+     "ruleId": "R01",
+     "変更前": "53",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "判定不能",
+     "ruleId": "R02",
+     "変更前": "18",
+     "変更後": "18"
+    },
+    {
+     "conclusion": "要注意",
+     "ruleId": "R02",
+     "変更前": "20",
+     "変更後": "20"
+    },
+    {
+     "conclusion": "出荷保留",
+     "ruleId": "R03",
+     "変更前": "17",
+     "変更後": "17"
+    },
+    {
+     "conclusion": "代替候補",
+     "ruleId": "R05",
+     "変更前": "1",
+     "変更後": "1"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [],
+  "markdown": [
+   "ルールの閾値を変えて再判定し、判定が変わるロットを比べます。rules グラフは書き換えず、判定クエリの VALUES に値を差し込んで `urn:whatif:evidence` に書き込みます。",
+   "**変更前**: 確定（rules の閾値）　→　**変更後**: what-if（R01=0.50, R02 倍率=1.0, R03=1）",
+   "**変更前のみ**（16 ロット）",
+   "**両方**（59 ロット）",
+   "**変更後のみ**（0 ロット）",
+   ":green[●] 接続中",
+   "20 graphs  \n7,995 triples"
+  ],
+  "metric": [
+   [
+    "判定ありロット（変更前）",
+    "75",
+    ""
+   ],
+   [
+    "判定ありロット（変更後）",
+    "59",
+    "-16"
+   ]
+  ],
+  "radio": [],
+  "selectbox": [],
+  "state": {
+   "main_tabs": "閾値を変える",
+   "whatif": "R01=0.50, R02 倍率=1.0, R03=1"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "whatif_before_0.05": {
+  "button": [
+   [
+    "再判定",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "R04〜R08 は判定クエリが未実装のため対象外です。比較方向（comparison）は rules シートの値を使います。",
+   "http://localhost:3030/kg"
+  ],
+  "code": [],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "当該サプライヤーの部品を消費した全ロットのうち、不良が報告されたロットの割合が閾値を超える場合、要注意とする。消費ロット数が最小標本数（min_denominator）未満の場合は判定不能（標本数不足）とする",
+     "minDenominator": "5",
+     "rule": "data:rule/R01",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "ロット製造開始日以前で最も新しい保全日から製造開始日までの日数が、設備の保全間隔（maint_interval_days）を超える場合、要注意とする。製造開始日以前の保全記録がない場合は判定不能とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R02",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "nan",
+     "thresholdUnit": "days(equipment)"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "description": "検査結果にNGが1件以上あるロットは出荷保留とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R03",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "代替検討",
+     "description": "評価（rating）が閾値未満のサプライヤーが供給する部品は代替候補検討の対象とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R04",
+     "ruleId": "R04",
+     "ruleName": "低評価サプライヤー",
+     "threshold": "3",
+     "thresholdUnit": "rating"
+    },
+    {
+     "comparison": "le",
+     "conclusion": "代替候補",
+     "description": "R04 に該当するサプライヤーが供給する部品について、同一規格（spec）かつ同一部品種別（part_type）の部品を供給する現行以外のサプライヤーのうち、その部品を消費した全ロットに対する不良ロットの割合が閾値以下のものを代替候補とする。消費ロット数が最小標本数（min_denominator）未満のサプライヤーは候補から除く",
+     "minDenominator": "5",
+     "rule": "data:rule/R05",
+     "ruleId": "R05",
+     "ruleName": "代替サプライヤー条件",
+     "threshold": "0.03",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "遅延リスク",
+     "description": "納期までの残日数が製造リードタイム未満で、対応ロットが未完了の場合は遅延リスクと判定する",
+     "minDenominator": "nan",
+     "rule": "data:rule/R06",
+     "ruleId": "R06",
+     "ruleName": "納期遅延リスク",
+     "threshold": "5",
+     "thresholdUnit": "days"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "設備起因疑い",
+     "description": "同一不良種別が同一設備で30日以内に2件以上発生した場合、設備起因を疑う",
+     "minDenominator": "nan",
+     "rule": "data:rule/R07",
+     "ruleId": "R07",
+     "ruleName": "設備起因疑い",
+     "threshold": "2",
+     "thresholdUnit": "count/30days"
+    },
+    {
+     "comparison": "nan",
+     "conclusion": "影響範囲",
+     "description": "重大度Highのクレームは、同一ロットを含む全出荷先を影響範囲とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R08",
+     "ruleId": "R08",
+     "ruleName": "影響範囲拡大",
+     "threshold": "High",
+     "thresholdUnit": "severity"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [
+   "「再判定」を押すと、変更前（確定の判定）との差分を表示します。"
+  ],
+  "markdown": [
+   "ルールの閾値を変えて再判定し、判定が変わるロットを比べます。rules グラフは書き換えず、判定クエリの VALUES に値を差し込んで `urn:whatif:evidence` に書き込みます。",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [],
+  "state": {
+   "main_tabs": "閾値を変える"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "whatif_before_0.3": {
+  "button": [
+   [
+    "再判定",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "R04〜R08 は判定クエリが未実装のため対象外です。比較方向（comparison）は rules シートの値を使います。",
+   "http://localhost:3030/kg"
+  ],
+  "code": [],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "当該サプライヤーの部品を消費した全ロットのうち、不良が報告されたロットの割合が閾値を超える場合、要注意とする。消費ロット数が最小標本数（min_denominator）未満の場合は判定不能（標本数不足）とする",
+     "minDenominator": "5",
+     "rule": "data:rule/R01",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "ロット製造開始日以前で最も新しい保全日から製造開始日までの日数が、設備の保全間隔（maint_interval_days）を超える場合、要注意とする。製造開始日以前の保全記録がない場合は判定不能とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R02",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "nan",
+     "thresholdUnit": "days(equipment)"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "description": "検査結果にNGが1件以上あるロットは出荷保留とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R03",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "代替検討",
+     "description": "評価（rating）が閾値未満のサプライヤーが供給する部品は代替候補検討の対象とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R04",
+     "ruleId": "R04",
+     "ruleName": "低評価サプライヤー",
+     "threshold": "3",
+     "thresholdUnit": "rating"
+    },
+    {
+     "comparison": "le",
+     "conclusion": "代替候補",
+     "description": "R04 に該当するサプライヤーが供給する部品について、同一規格（spec）かつ同一部品種別（part_type）の部品を供給する現行以外のサプライヤーのうち、その部品を消費した全ロットに対する不良ロットの割合が閾値以下のものを代替候補とする。消費ロット数が最小標本数（min_denominator）未満のサプライヤーは候補から除く",
+     "minDenominator": "5",
+     "rule": "data:rule/R05",
+     "ruleId": "R05",
+     "ruleName": "代替サプライヤー条件",
+     "threshold": "0.03",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "遅延リスク",
+     "description": "納期までの残日数が製造リードタイム未満で、対応ロットが未完了の場合は遅延リスクと判定する",
+     "minDenominator": "nan",
+     "rule": "data:rule/R06",
+     "ruleId": "R06",
+     "ruleName": "納期遅延リスク",
+     "threshold": "5",
+     "thresholdUnit": "days"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "設備起因疑い",
+     "description": "同一不良種別が同一設備で30日以内に2件以上発生した場合、設備起因を疑う",
+     "minDenominator": "nan",
+     "rule": "data:rule/R07",
+     "ruleId": "R07",
+     "ruleName": "設備起因疑い",
+     "threshold": "2",
+     "thresholdUnit": "count/30days"
+    },
+    {
+     "comparison": "nan",
+     "conclusion": "影響範囲",
+     "description": "重大度Highのクレームは、同一ロットを含む全出荷先を影響範囲とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R08",
+     "ruleId": "R08",
+     "ruleName": "影響範囲拡大",
+     "threshold": "High",
+     "thresholdUnit": "severity"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [
+   "「再判定」を押すと、変更前（確定の判定）との差分を表示します。"
+  ],
+  "markdown": [
+   "ルールの閾値を変えて再判定し、判定が変わるロットを比べます。rules グラフは書き換えず、判定クエリの VALUES に値を差し込んで `urn:whatif:evidence` に書き込みます。",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [],
+  "state": {
+   "main_tabs": "閾値を変える"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "whatif_before_0.5": {
+  "button": [
+   [
+    "再判定",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "R04〜R08 は判定クエリが未実装のため対象外です。比較方向（comparison）は rules シートの値を使います。",
+   "http://localhost:3030/kg"
+  ],
+  "code": [],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "当該サプライヤーの部品を消費した全ロットのうち、不良が報告されたロットの割合が閾値を超える場合、要注意とする。消費ロット数が最小標本数（min_denominator）未満の場合は判定不能（標本数不足）とする",
+     "minDenominator": "5",
+     "rule": "data:rule/R01",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "description": "ロット製造開始日以前で最も新しい保全日から製造開始日までの日数が、設備の保全間隔（maint_interval_days）を超える場合、要注意とする。製造開始日以前の保全記録がない場合は判定不能とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R02",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "nan",
+     "thresholdUnit": "days(equipment)"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "description": "検査結果にNGが1件以上あるロットは出荷保留とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R03",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "代替検討",
+     "description": "評価（rating）が閾値未満のサプライヤーが供給する部品は代替候補検討の対象とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R04",
+     "ruleId": "R04",
+     "ruleName": "低評価サプライヤー",
+     "threshold": "3",
+     "thresholdUnit": "rating"
+    },
+    {
+     "comparison": "le",
+     "conclusion": "代替候補",
+     "description": "R04 に該当するサプライヤーが供給する部品について、同一規格（spec）かつ同一部品種別（part_type）の部品を供給する現行以外のサプライヤーのうち、その部品を消費した全ロットに対する不良ロットの割合が閾値以下のものを代替候補とする。消費ロット数が最小標本数（min_denominator）未満のサプライヤーは候補から除く",
+     "minDenominator": "5",
+     "rule": "data:rule/R05",
+     "ruleId": "R05",
+     "ruleName": "代替サプライヤー条件",
+     "threshold": "0.03",
+     "thresholdUnit": "ratio"
+    },
+    {
+     "comparison": "lt",
+     "conclusion": "遅延リスク",
+     "description": "納期までの残日数が製造リードタイム未満で、対応ロットが未完了の場合は遅延リスクと判定する",
+     "minDenominator": "nan",
+     "rule": "data:rule/R06",
+     "ruleId": "R06",
+     "ruleName": "納期遅延リスク",
+     "threshold": "5",
+     "thresholdUnit": "days"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "設備起因疑い",
+     "description": "同一不良種別が同一設備で30日以内に2件以上発生した場合、設備起因を疑う",
+     "minDenominator": "nan",
+     "rule": "data:rule/R07",
+     "ruleId": "R07",
+     "ruleName": "設備起因疑い",
+     "threshold": "2",
+     "thresholdUnit": "count/30days"
+    },
+    {
+     "comparison": "nan",
+     "conclusion": "影響範囲",
+     "description": "重大度Highのクレームは、同一ロットを含む全出荷先を影響範囲とする",
+     "minDenominator": "nan",
+     "rule": "data:rule/R08",
+     "ruleId": "R08",
+     "ruleName": "影響範囲拡大",
+     "threshold": "High",
+     "thresholdUnit": "severity"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [],
+  "info": [
+   "「再判定」を押すと、変更前（確定の判定）との差分を表示します。"
+  ],
+  "markdown": [
+   "ルールの閾値を変えて再判定し、判定が変わるロットを比べます。rules グラフは書き換えず、判定クエリの VALUES に値を差し込んで `urn:whatif:evidence` に書き込みます。",
+   ":green[●] 接続中",
+   "19 graphs  \n6,968 triples"
+  ],
+  "metric": [],
+  "radio": [],
+  "selectbox": [],
+  "state": {
+   "main_tabs": "閾値を変える"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "whatif_to_cq06_L0048": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "10 ノード・15 エッジ。濃青=判定対象 / 水色=根拠事実 / 橙=適用ルール / 紫=結論 / 灰色破線=判定不能。エッジはすべて実在トリプル。ノードにカーソルを合わせると属性値を表示。",
+   "自己点検: 根拠外の ID・名前・数値、推測・提案表現、該当なしへの読み替えは検出されませんでした。",
+   "参照した判定: what-if（R01=0.30, R02 倍率=1.0, R03=1）（urn:whatif:evidence）",
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ06: ロットLは「要注意」か。判定理由を経路で示せ (R01, R02, R03)\n# path: lot <- Evidence（urn:src:evidence）-> rule / 根拠事実\n#\n# 判定は queries/evidence_r0*.rq が urn:src:evidence に書き戻した ex:Evidence をそのまま読む。\n# アプリの判定・根拠経路・説明文も同じ Evidence を元にするため、結果テーブルと画面の判定は常に一致する。\n# 1 行 = 1 Evidence（該当ルール）。行が無ければどのルールにも該当しない。\n# 判定不能（R02 で保全記録が無いなど）は conclusion「判定不能」と undeterminedReason で返す。\n# 結論の重い順（出荷保留 > 要注意 > 判定不能）の並べ替えはアプリ層で行う。\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator\n       ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\n       (GROUP_CONCAT(DISTINCT STR(?fact); separator=\" \") AS ?facts)\nWHERE {\n    VALUES ?lot { <http://example.org/kg/data/lot/L0048> }  # 対象ロットはアプリ層で差し替える\n    GRAPH <urn:whatif:evidence> {\n        ?evidence ex:evidenceSubject ?lot ;\n                  ex:evidenceRule ?rule ;\n                  ex:conclusion ?conclusion ;\n                  ex:appliedThreshold ?threshold ;\n                  ex:evidenceFact ?fact .\n        OPTIONAL { ?evidence ex:observedValue ?observedValue . }\n        OPTIONAL { ?evidence ex:observedNumerator ?numerator . }\n        OPTIONAL { ?evidence ex:observedDenominator ?denominator . }\n        OPTIONAL { ?evidence ex:undeterminedReason ?undeterminedReason . }\n    }\n    ?rule ex:rule_id ?ruleId ; ex:rule_name ?ruleName .\n    OPTIONAL { ?rule ex:comparison ?comparison . }\n    OPTIONAL { ?rule ex:threshold_unit ?thresholdUnit . }\n}\nGROUP BY ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator\n         ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\nORDER BY ?ruleId"
+  ],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "denominator": "30",
+     "evidence": "data:evidence/whatif/R02-L0048",
+     "facts": "data:equipment/E003 http://example.org/kg/data/operation/OP048 http://example.org/kg/data/maintenance/M008",
+     "lot": "data:lot/L0048",
+     "numerator": "33",
+     "observedValue": "33",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "30",
+     "thresholdUnit": "days(equipment)",
+     "undeterminedReason": "None"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "denominator": "nan",
+     "evidence": "data:evidence/whatif/R03-L0048",
+     "facts": "data:spec/SP017 http://example.org/kg/data/inspection/I048",
+     "lot": "data:lot/L0048",
+     "numerator": "1",
+     "observedValue": "1",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count",
+     "undeterminedReason": "None"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "実行した SPARQL",
+   "結果テーブル（全列・2 件）"
+  ],
+  "info": [],
+  "markdown": [
+   "### 判定: 出荷保留",
+   "- **出荷保留** — R03 検査NG　1 件（閾値 1 件）",
+   "- **要注意** — R02 保全間隔超過　33 日（閾値 30 日）",
+   "#### 根拠経路",
+   "#### 説明",
+   "スタブ説明: 判断ルールR03（検査NG）=出荷保留、判断ルールR02（保全間隔超過）=要注意",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "20 graphs  \n7,995 triples"
+  ],
+  "metric": [],
+  "radio": [
+   [
+    "参照する判定",
+    "urn:whatif:evidence"
+   ]
+  ],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq06"
+   ],
+   [
+    "対象を選ぶ（?lot）",
+    "http://example.org/kg/data/lot/L0048"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq06",
+   "evidence_graph": "urn:whatif:evidence",
+   "last_run": [
+    "cq06",
+    "http://example.org/kg/data/lot/L0048"
+   ],
+   "main_tabs": "質問する",
+   "nl_question": "",
+   "target_cq06": "http://example.org/kg/data/lot/L0048",
+   "whatif": "R01=0.30, R02 倍率=1.0, R03=1"
+  },
+  "toast": [],
+  "warning": []
+ },
+ "whatif_to_cq06_L0048_confirmed": {
+  "button": [
+   [
+    "実行",
+    null
+   ],
+   [
+    "SPARQL を生成",
+    null
+   ],
+   [
+    "再読込",
+    null
+   ],
+   [
+    "判定を再生成",
+    null
+   ]
+  ],
+  "caption": [
+   "15 ノード・24 エッジ。濃青=判定対象 / 水色=根拠事実 / 橙=適用ルール / 紫=結論 / 灰色破線=判定不能。エッジはすべて実在トリプル。ノードにカーソルを合わせると属性値を表示。",
+   "自己点検: 根拠外の ID・名前・数値、推測・提案表現、該当なしへの読み替えは検出されませんでした。",
+   "参照した判定: 確定（rules の閾値）（urn:src:evidence）",
+   "http://localhost:3030/kg"
+  ],
+  "code": [
+   "# CQ06: ロットLは「要注意」か。判定理由を経路で示せ (R01, R02, R03)\n# path: lot <- Evidence（urn:src:evidence）-> rule / 根拠事実\n#\n# 判定は queries/evidence_r0*.rq が urn:src:evidence に書き戻した ex:Evidence をそのまま読む。\n# アプリの判定・根拠経路・説明文も同じ Evidence を元にするため、結果テーブルと画面の判定は常に一致する。\n# 1 行 = 1 Evidence（該当ルール）。行が無ければどのルールにも該当しない。\n# 判定不能（R02 で保全記録が無いなど）は conclusion「判定不能」と undeterminedReason で返す。\n# 結論の重い順（出荷保留 > 要注意 > 判定不能）の並べ替えはアプリ層で行う。\nPREFIX ex:   <http://example.org/kg/ontology#>\nPREFIX data: <http://example.org/kg/data/>\n\nSELECT ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator\n       ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\n       (GROUP_CONCAT(DISTINCT STR(?fact); separator=\" \") AS ?facts)\nWHERE {\n    VALUES ?lot { <http://example.org/kg/data/lot/L0048> }  # 対象ロットはアプリ層で差し替える\n    GRAPH <urn:src:evidence> {\n        ?evidence ex:evidenceSubject ?lot ;\n                  ex:evidenceRule ?rule ;\n                  ex:conclusion ?conclusion ;\n                  ex:appliedThreshold ?threshold ;\n                  ex:evidenceFact ?fact .\n        OPTIONAL { ?evidence ex:observedValue ?observedValue . }\n        OPTIONAL { ?evidence ex:observedNumerator ?numerator . }\n        OPTIONAL { ?evidence ex:observedDenominator ?denominator . }\n        OPTIONAL { ?evidence ex:undeterminedReason ?undeterminedReason . }\n    }\n    ?rule ex:rule_id ?ruleId ; ex:rule_name ?ruleName .\n    OPTIONAL { ?rule ex:comparison ?comparison . }\n    OPTIONAL { ?rule ex:threshold_unit ?thresholdUnit . }\n}\nGROUP BY ?lot ?ruleId ?ruleName ?conclusion ?observedValue ?numerator ?denominator\n         ?threshold ?thresholdUnit ?comparison ?undeterminedReason ?evidence\nORDER BY ?ruleId"
+  ],
+  "dataframe": [
+   [
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "denominator": "11",
+     "evidence": "data:evidence/R01-L0048",
+     "facts": "data:supplier/S002 http://example.org/kg/data/purchase/PU017 http://example.org/kg/data/partConsumption/LP048",
+     "lot": "data:lot/L0048",
+     "numerator": "2",
+     "observedValue": "0.181818181818181818181818",
+     "ruleId": "R01",
+     "ruleName": "サプライヤー不良率",
+     "threshold": "0.05",
+     "thresholdUnit": "ratio",
+     "undeterminedReason": "None"
+    },
+    {
+     "comparison": "gt",
+     "conclusion": "要注意",
+     "denominator": "30",
+     "evidence": "data:evidence/R02-L0048",
+     "facts": "data:equipment/E003 http://example.org/kg/data/operation/OP048 http://example.org/kg/data/maintenance/M008",
+     "lot": "data:lot/L0048",
+     "numerator": "33",
+     "observedValue": "33",
+     "ruleId": "R02",
+     "ruleName": "保全間隔超過",
+     "threshold": "30",
+     "thresholdUnit": "days(equipment)",
+     "undeterminedReason": "None"
+    },
+    {
+     "comparison": "ge",
+     "conclusion": "出荷保留",
+     "denominator": "nan",
+     "evidence": "data:evidence/R03-L0048",
+     "facts": "data:spec/SP017 http://example.org/kg/data/inspection/I048",
+     "lot": "data:lot/L0048",
+     "numerator": "1",
+     "observedValue": "1",
+     "ruleId": "R03",
+     "ruleName": "検査NG",
+     "threshold": "1",
+     "thresholdUnit": "count",
+     "undeterminedReason": "None"
+    }
+   ]
+  ],
+  "error": [],
+  "exception": [],
+  "expander": [
+   "実行した SPARQL",
+   "結果テーブル（全列・3 件）"
+  ],
+  "info": [],
+  "markdown": [
+   "### 判定: 出荷保留",
+   "- **出荷保留** — R03 検査NG　1 件（閾値 1 件）",
+   "- **要注意** — R01 サプライヤー不良率　2 / 11 = 0.18（閾値 0.05）",
+   "- **要注意** — R02 保全間隔超過　33 日（閾値 30 日）",
+   "#### 根拠経路",
+   "#### 説明",
+   "スタブ説明: 判断ルールR03（検査NG）=出荷保留、判断ルールR01（サプライヤー不良率）=要注意、判断ルールR02（保全間隔超過）=要注意",
+   "#### 自由入力（自然文 → SPARQL）",
+   ":green[●] 接続中",
+   "20 graphs  \n7,995 triples"
+  ],
+  "metric": [],
+  "radio": [
+   [
+    "参照する判定",
+    "urn:src:evidence"
+   ]
+  ],
+  "selectbox": [
+   [
+    "CQ を選ぶ",
+    "cq06"
+   ],
+   [
+    "対象を選ぶ（?lot）",
+    "http://example.org/kg/data/lot/L0048"
+   ]
+  ],
+  "state": {
+   "cq_select": "cq06",
+   "evidence_graph": "urn:src:evidence",
+   "last_run": [
+    "cq06",
+    "http://example.org/kg/data/lot/L0048"
+   ],
+   "main_tabs": "質問する",
+   "nl_question": "",
+   "target_cq06": "http://example.org/kg/data/lot/L0048",
+   "whatif": "R01=0.30, R02 倍率=1.0, R03=1"
+  },
+  "toast": [],
+  "warning": []
+ }
+}
