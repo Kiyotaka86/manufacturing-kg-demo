@@ -60,7 +60,8 @@ WHERE {
 
   # 2. 経過日数と「保全間隔 × 倍率」を比較する。保全記録が無いロットは判定不能として残す
   ?eq ex:maint_interval_days ?interval .
-  BIND(?interval * ?intervalFactor AS ?threshold)
+  # 倍率 1.0 のときは保全間隔（整数）をそのまま閾値にする（表示が 30.0 にならないように）
+  BIND(IF(?intervalFactor = 1, ?interval, ?interval * ?intervalFactor) AS ?threshold)
   BIND(fn:days-from-duration(?start - ?lastDate) AS ?days)
   FILTER(!BOUND(?lastDate) ||
          (?cmp = "gt" && ?days >  ?threshold) || (?cmp = "ge" && ?days >= ?threshold) ||

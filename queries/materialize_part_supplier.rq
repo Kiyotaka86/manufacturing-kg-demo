@@ -1,0 +1,13 @@
+# ex:partSuppliedBy の実体化
+# owl:propertyChainAxiom ( [owl:inverseOf ex:purchasedPart] ex:purchasedFrom )
+# Reasoner は使わず、投入時にこの SPARQL UPDATE で urn:derived:chains に書き出す
+# R05（代替サプライヤー）の根拠経路「現行サプライヤー ← 部品 → 規格 ← 代替部品 → 代替サプライヤー」を
+# 購買ノードを経由せずに描けるようにするためのショートカット
+PREFIX ex:   <http://example.org/kg/ontology#>
+
+INSERT {
+    GRAPH <urn:derived:chains> { ?part ex:partSuppliedBy ?supplier }
+}
+WHERE {
+    GRAPH <urn:src:purchases> { ?purchase ex:purchasedPart ?part ; ex:purchasedFrom ?supplier . }
+}

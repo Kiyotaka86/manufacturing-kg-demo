@@ -1,0 +1,11 @@
+# アプリ用（タブ3）: クラスごとのインスタンス数（ex: 名前空間のクラスのみ）
+# スキーマ（rdfs:label など）は既定グラフに入っているが、tdb2:unionDefaultGraph により
+# クエリの既定グラフは名前付きグラフの和になるため、ここからは参照できない。
+PREFIX ex:   <http://example.org/kg/ontology#>
+
+SELECT ?class (COUNT(DISTINCT ?s) AS ?instances) WHERE {
+    ?s a ?class .
+    FILTER(STRSTARTS(STR(?class), STR(ex:)))
+}
+GROUP BY ?class
+ORDER BY DESC(?instances) ?class

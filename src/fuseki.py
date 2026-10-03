@@ -120,3 +120,15 @@ def run_cq(cq: CQ, target: str | None = None) -> tuple[str, pd.DataFrame]:
     if cq.target_var and target:
         query = bind_values(query, cq.target_var, target)
     return query, select(query)
+
+
+def try_select(query: str) -> tuple[pd.DataFrame | None, str | None]:
+    """生成 SPARQL の試行用。成功なら (結果, None)、構文エラー等なら (None, エラー内容)、0 件なら (結果, "0 件")。
+
+    実行は query エンドポイントのみ（update は受け付けないため、生成クエリがデータを書き換えることはない）。
+    """
+    try:
+        df = select(query)
+    except httpx.HTTPStatusError as e:
+        return None, f"HTTP {e.response.status_code}: {e.response.text[:800]}"
+    return df, ("結果が 0 件でした" if df.empty else None)

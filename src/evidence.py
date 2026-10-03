@@ -34,15 +34,20 @@ RULE_QUERIES = {
     "R01": "evidence_r01_supplier_defect.rq",
     "R02": "evidence_r02_maint_overdue.rq",
     "R03": "evidence_r03_inspection_ng.rq",
+    "R05": "evidence_r05_alternative.rq",
 }
 
 
 # 結論の重さ（小さいほど重い）。画面・説明文ともこの順に並べる。未知の結論は最後
-CONCLUSION_ORDER = {"出荷保留": 0, "要注意": 1, "判定不能": 2}
+CONCLUSION_ORDER = {"出荷保留": 0, "要注意": 1, "代替候補": 2, "判定不能": 3}
 UNDETERMINED = "判定不能"
 
+# 判定の前提になるルール（R05 は R04 該当サプライヤーの部品だけを対象にする）。説明文に前提として渡す
+RULE_PRECONDITIONS = {"R05": ["R04"]}
+
 # what-if で差し替えられる VALUES 変数（ルール別）。判定クエリ内の VALUES 行と対応する
-OVERRIDE_VARS = {"R01": "thresholdOverride", "R02": "intervalFactor", "R03": "thresholdOverride"}
+OVERRIDE_VARS = {"R01": "thresholdOverride", "R02": "intervalFactor", "R03": "thresholdOverride",
+                 "R05": "thresholdOverride"}
 
 
 def order_by_conclusion(detail: pd.DataFrame) -> list[str]:

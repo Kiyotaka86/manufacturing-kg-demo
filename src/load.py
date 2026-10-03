@@ -35,6 +35,7 @@ XLSX_TO_RDF = ROOT / "scripts" / "xlsx_to_rdf.py"
 MATERIALIZE_QUERIES = [
     ROOT / "queries" / "materialize_lot_supplier.rq",
     ROOT / "queries" / "materialize_lot_equipment.rq",
+    ROOT / "queries" / "materialize_part_supplier.rq",
 ]
 
 

@@ -26,6 +26,7 @@ THRESHOLD_FACT_TYPES = {
     "R01": {"Supplier"},  # サプライヤー単位の不良率を閾値と比較する
     "R02": {"Equipment", "Maintenance"},  # 最終保全日と設備の保全間隔を比較する
     "R03": {"Inspection"},  # NG となった検査の件数を閾値と比較する
+    "R05": {"Part", "Supplier"},  # 代替部品・代替サプライヤー（不良率を閾値と比較する対象）
 }
 
 STYLE = {

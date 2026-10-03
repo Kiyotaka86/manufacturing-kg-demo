@@ -1,7 +1,8 @@
-"""Claude API 呼び出し（APP_SPEC.md 第4節）。現時点は説明文生成のみ。
+"""Claude API 呼び出し（APP_SPEC.md 第4節）。説明文生成と自然文→SPARQL の2箇所のみ。
 
-Claude に渡すのは SPARQL が返した値の組み替えだけで、数値の計算はさせない。
-生成文は audit() で根拠データとの突き合わせを行い、根拠にない ID・数値・推測表現を検出する。
+説明文: Claude に渡すのは SPARQL が返した値の組み替えだけで、数値の計算はさせない。
+  生成文は audit() で根拠データとの突き合わせを行い、根拠にない ID・数値・推測表現を検出する。
+自然文→SPARQL: 生成した SPARQL は実行しない（実行はアプリ側でユーザーの承認後）。
 """
 
 import json
@@ -15,6 +16,7 @@ import pandas as pd
 from dotenv import load_dotenv
 
 import evidence
+import fuseki
 import viz
 
 load_dotenv()
@@ -24,32 +26,37 @@ PROMPTS = ROOT / "prompts"
 MODEL = "claude-sonnet-5-5"
 # APP_SPEC の 500 は1ルール分。複数ルールを1本にまとめるときは該当ルール数に比例させる
 MAX_TOKENS_PER_JUDGEMENT = 500
+MAX_TOKENS_SPARQL = 1500
+# 自然文→SPARQL の参考クエリ（prompts/nl_to_sparql.md の {{EXAMPLES}}）。経路・集計・ルール参照の例
+NL_EXAMPLES = ["cq01.rq", "cq03.rq", "cq04.rq"]
 
 PREFIXES = {
     "http://example.org/kg/data/": "data:",
     "http://example.org/kg/ontology#": "ex:",
 }
 
-# 説明文に渡す根拠ノードの属性（判定経路の説明に使うものだけ）。数量・評価・地域などは渡さない。
+# 説明文に渡す根拠ノードの属性（ルール別。判定経路の説明に使うものだけ）。数量・地域などは渡さない。
 # 経路グラフのツールチップには全属性を出す
 EXPLAIN_ATTRS = {
-    "start_date",  # Lot（R02: 経過日数の起点）
-    "started_at",  # Operation
-    "maint_interval_days",  # Equipment（R02 の閾値）
-    "maint_date", "maint_type",  # Maintenance（R02 の最終保全）
-    "measured_value", "result", "inspected_at",  # Inspection（R03）
-    "parameter", "min_value", "max_value", "unit",  # Spec（R03 の規格上下限）
+    "R01": set(),
+    "R02": {"start_date", "started_at", "maint_interval_days", "maint_date", "maint_type"},
+    "R03": {"measured_value", "result", "inspected_at", "parameter", "min_value", "max_value", "unit"},
+    "R05": {"rating", "parameter"},  # 現行サプライヤーの評価（R04 の判定根拠）と規格のパラメータ
 }
 
 # prompts/evidence_to_text.md の制約（推測・断定回避・提案の禁止）に反する表現
 HEDGES = ["思われ", "可能性", "推測", "考えられ", "おそらく", "かもしれ", "見られ", "恐れ", "推奨", "べき", "対策"]
 
-# 英数字に続かない ID（タイムスタンプ "2026-06-24T15:00" の "T15" を ID と誤認しない）
 # 判定不能を「該当なし」と読み替える表現。payload に入るのは該当か判定不能だけなので、常に誤り
 NOT_APPLICABLE = ["該当なし", "該当しない", "該当せず", "非該当", "問題なし", "問題ない"]
+# 代替候補に推奨の強さ・優劣を付ける表現（R05 は条件を満たすかどうかだけを判定している）
+STRENGTH = ["最適", "推奨度", "より良い", "より優れ", "最も", "おすすめ", "ベスト", "優先", "第一候補", "有力"]
 
+# 英数字に続かない ID（タイムスタンプ "2026-06-24T15:00" の "T15" を ID と誤認しない）
 ID_TOKEN = re.compile(r"(?<![0-9A-Za-z])[A-Z]{1,3}\d{2,}")
 NUM_TOKEN = re.compile(r"\d+(?:\.\d+)?")
+# 根拠データに無い個数・序数（「2つのルール」「1つ目の候補」）。数字が偶然データにあっても検出する
+COUNT_TOKEN = re.compile(r"[0-9０-９一二三四五六七八九]+(?:つ目|番目|点目|つの|点で)")
 
 
 def available() -> bool:
@@ -81,8 +88,9 @@ def evidence_payload(detail: pd.DataFrame, edges: pd.DataFrame, props: pd.DataFr
     """
     edges = edges.drop_duplicates().map(compact)
     attrs: dict[str, dict] = {}
-    for r in props[props.p.map(lambda p: p.rsplit("#", 1)[-1] in EXPLAIN_ATTRS)].itertuples():
-        attrs.setdefault(compact(r.node), {})[compact(r.p)] = r.o
+    for r in props.itertuples():
+        attrs.setdefault(compact(r.node), {})[r.p.rsplit("#", 1)[-1]] = r.o
+    rules = rule_table()
     judgements = []
     for ev_iri in evidence.order_by_conclusion(detail):
         group = detail[detail.evidence == ev_iri]
@@ -98,7 +106,10 @@ def evidence_payload(detail: pd.DataFrame, edges: pd.DataFrame, props: pd.DataFr
         judgements.append({
             "evidence": ev_iri,
             "conclusion": head["conclusion"],
-            "rule": {"id": head["ruleId"], "name": head["ruleName"], "threshold_unit": head["thresholdUnit"]},
+            "rule": {"id": head["ruleId"], "name": head["ruleName"], "threshold_unit": head["thresholdUnit"],
+                     "comparison": head["comparison"]},
+            # 判定の前提になったルール（R05 は R04 該当が前提）。値は rules グラフのまま
+            "preconditions": [rules[r] for r in evidence.RULE_PRECONDITIONS.get(head["ruleId"], [])],
             # 画面と同じ表記（比率は小数2桁）。説明文と画面の数値を一致させる
             "observedValue": viz.display_value(head["observedValue"], head["thresholdUnit"]),
             "measures": measures,
@@ -107,7 +118,8 @@ def evidence_payload(detail: pd.DataFrame, edges: pd.DataFrame, props: pd.DataFr
             "evaluatedAt": head["evaluatedAt"],
             "nodes": [
                 {"iri": r["node"], "role": r["role"], "class": r["type"], "name": r["name"],
-                 "attributes": attrs.get(r["node"], {})}
+                 "attributes": {k: v for k, v in attrs.get(r["node"], {}).items()
+                                if k in EXPLAIN_ATTRS.get(head["ruleId"], set())}}
                 for r in rows
             ],
             "path": [
@@ -117,6 +129,13 @@ def evidence_payload(detail: pd.DataFrame, edges: pd.DataFrame, props: pd.DataFr
             ],
         })
     return {"judgements": judgements}
+
+
+def rule_table() -> dict[str, dict]:
+    """rules グラフのルール（ID → id, name, threshold, comparison）。前提ルールの説明に使う。"""
+    df = fuseki.select(fuseki.load_query("app_rules.rq"))
+    return {r.ruleId: {"id": r.ruleId, "name": r.ruleName, "threshold": r.threshold, "comparison": r.comparison}
+            for r in df.itertuples()}
 
 
 def explain(payload: dict) -> str:
@@ -172,4 +191,42 @@ def audit(text: str, payload: dict, known_names: list[str] = ()) -> list[str]:
 
     issues += [f"推測・提案表現: 「{h}」" for h in HEDGES if h in text]
     issues += [f"該当なしへの読み替え: 「{w}」" for w in NOT_APPLICABLE if w in text]
+    issues += [f"推奨の強さ・優劣: 「{w}」" for w in STRENGTH if w in text]
+    issues += [f"根拠にない個数・序数: 「{w}」" for w in sorted(set(COUNT_TOKEN.findall(text)))]
     return issues
+
+
+def _strip_fences(text: str) -> str:
+    """コードフェンスが付いて返ってきた場合に外す（プロンプトでは禁止しているが念のため）。"""
+    m = re.search(r"```(?:sparql)?\s*(.*?)```", text, re.DOTALL)
+    return (m.group(1) if m else text).strip()
+
+
+def nl_to_sparql(question: str, previous: str | None = None, error: str | None = None) -> str:
+    """自然文の質問から SPARQL を生成する。previous/error を渡すと、失敗内容を添えて再生成する。"""
+    examples = "\n\n".join((ROOT / "queries" / name).read_text(encoding="utf-8") for name in NL_EXAMPLES)
+    system = (load_prompt("nl_to_sparql.md")
+              .replace("{{SCHEMA}}", (ROOT / "ontology" / "schema.ttl").read_text(encoding="utf-8"))
+              .replace("{{EXAMPLES}}", examples))
+    messages = [{"role": "user", "content": question}]
+    if previous is not None:
+        messages += [
+            {"role": "assistant", "content": previous},
+            {"role": "user", "content": f"このクエリは失敗した。\n{error}\n失敗の原因を直した SPARQL 本文だけを出力して。"},
+        ]
+    response = anthropic.Anthropic().beta.messages.create(
+        model=MODEL,
+        max_tokens=MAX_TOKENS_SPARQL,
+        thinking={"type": "between_tools"},
+        output_config={"effort": "medium"},
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
+        system=system,
+        messages=messages,
+    )
+    if response.stop_reason == "refusal":
+        raise RuntimeError("SPARQL の生成が拒否されました（stop_reason=refusal）")
+    text = "".join(b.text for b in response.content if b.type == "text")
+    if response.stop_reason == "max_tokens":
+        raise RuntimeError(f"SPARQL が max_tokens={MAX_TOKENS_SPARQL} で途切れました")
+    return _strip_fences(text)

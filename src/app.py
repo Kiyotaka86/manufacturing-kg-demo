@@ -1,10 +1,13 @@
 """ナレッジグラフ予行練習アプリ。起動: uv run streamlit run src/app.py
 
-現時点の実装範囲（APP_SPEC.md 第7節 1〜6 の一部）:
+現時点の実装範囲（APP_SPEC.md 第7節 1〜7。タブ3 の個体探索を除く）:
 - サイドバー: Fuseki 接続状態、判定の再生成、表示オプション
-- タブ1: CQ01〜05 はテーブル表示。CQ06 は「判定 → 根拠経路グラフ → 説明文」（R01〜R03）
+- タブ1: CQ01〜05 はテーブル表示。CQ06（ロット判定 R01〜R03）・CQ08（代替候補 R05）は
+  「判定 → 根拠経路グラフ → 説明文」。CQ07 は既存 Evidence の集計による原因候補の順位付け。
+  下部に自然文→SPARQL（生成 → 表示 → 承認後に実行、失敗時の再生成は1回まで）
 - タブ2: 閾値を変えた what-if 判定と、変更前後の差分。ロットを押すとタブ1 の CQ06 で経路を開く
-タブ3、CQ07〜10、自然文→SPARQL は後続段階で実装する。
+- タブ3: グラフ別・クラス別の件数
+CQ09〜10 は R06 以降の判定クエリが揃ってから追加する。
 """
 
 import json
@@ -20,8 +23,14 @@ import llm
 import viz
 
 TABLE_ONLY_CQS = {"cq01", "cq02", "cq03", "cq04", "cq05"}
-# 判定系 CQ。CQ07〜10 は R04 以降の判定クエリ（queries/evidence_*.rq）が揃ってから追加する
-JUDGEMENT_CQS = {"cq06"}
+# 判定系 CQ（Evidence を判定・経路・説明文で示す）と、Evidence の集計で順位を付ける CQ
+JUDGEMENT_CQS = {"cq06", "cq08"}
+RANKING_CQS = {"cq07"}
+EVIDENCE_CQS = JUDGEMENT_CQS | RANKING_CQS
+EMPTY_JUDGEMENT = {
+    "cq06": ("該当なし", "R01〜R03 のいずれの条件も満たしていません（判定不能も含めて Evidence がありません）。"),
+    "cq08": ("代替候補なし", "この部品の現行サプライヤーが R04 に該当しないか、R05 を満たす代替がありません。"),
+}
 
 TAB_ASK, TAB_WHATIF, TAB_GRAPH = "質問する", "閾値を変える", "グラフを見る"
 
@@ -100,16 +109,23 @@ def render_judgement(cq: fuseki.CQ, target: str, graph: str, show_sparql: bool, 
     df = fuseki.select(query)
     detail = evidence.evidence_for(target, graph)
 
-    # 1. 判定（cq06 の結果をそのまま表示。結論の重い順: 出荷保留 > 要注意 > 判定不能）
+    # 1. 判定（CQ の結果をそのまま表示。結論の重い順: 出荷保留 > 要注意 > 代替候補 > 判定不能）
     if df.empty:
-        st.markdown("### 判定: 該当なし")
-        st.caption("R01〜R03 のいずれの条件も満たしていません（判定不能も含めて Evidence がありません）。")
+        title, note = EMPTY_JUDGEMENT[cq.id]
+        st.markdown(f"### 判定: {title}")
+        st.caption(note)
     else:
         order = evidence.order_by_conclusion(df)
         heads = df.set_index("evidence").loc[order].reset_index()
+        names = detail.drop_duplicates("node").set_index("node")["name"]
         st.markdown(f"### 判定: {heads.conclusion.iloc[0]}")
         for ev in heads.itertuples():
-            st.markdown(f"- **{ev.conclusion}** — {ev.ruleId} {ev.ruleName} {viz.observed_text(ev)}")
+            # CQ08 は代替部品・代替サプライヤーを併記する（推奨の強さは付けない）
+            parts = [f"**{ev.conclusion}** — {ev.ruleId} {ev.ruleName}"]
+            if "altSupplier" in heads.columns:
+                parts.append(" ".join(f"{viz.local(i)} {names.get(i) or ''}".strip() for i in (ev.altPart, ev.altSupplier)))
+            parts.append(viz.observed_text(ev))
+            st.markdown("- " + "　".join(parts))
 
         # 2. 根拠経路
         st.markdown("#### 根拠経路")
@@ -145,7 +161,7 @@ def render_judgement(cq: fuseki.CQ, target: str, graph: str, show_sparql: bool, 
 
 
 def tab_ask(show_sparql: bool, explain_on: bool) -> None:
-    cqs = {cq.id: cq for cq in fuseki.list_cqs() if cq.id in TABLE_ONLY_CQS | JUDGEMENT_CQS}
+    cqs = {cq.id: cq for cq in fuseki.list_cqs() if cq.id in TABLE_ONLY_CQS | EVIDENCE_CQS}
     cq = cqs[st.selectbox("CQ を選ぶ", list(cqs), format_func=lambda i: cqs[i].title, key="cq_select")]
 
     target = None
@@ -159,24 +175,113 @@ def tab_ask(show_sparql: bool, explain_on: bool) -> None:
         target = st.selectbox(f"対象を選ぶ（?{cq.target_var}）", iris, format_func=labels.get, key=key)
 
     graph = evidence.EVIDENCE_GRAPH
-    if cq.id in JUDGEMENT_CQS and not evidence.counts(evidence.WHATIF_GRAPH).empty:
+    if cq.id in EVIDENCE_CQS and not evidence.counts(evidence.WHATIF_GRAPH).empty:
         graphs = [evidence.EVIDENCE_GRAPH, evidence.WHATIF_GRAPH]
         graph = st.radio("参照する判定", graphs, format_func=graph_label, horizontal=True, key="evidence_graph")
 
     # 実行結果は選択が変わるまで保持する（チェックボックス操作などの再描画で消さない）
     if st.button("実行", type="primary"):
         st.session_state["last_run"] = (cq.id, target)
-    if st.session_state.get("last_run") != (cq.id, target):
-        return
+    if st.session_state.get("last_run") == (cq.id, target):
+        render_selected(cq, target, graph, show_sparql, explain_on)
+    st.divider()
+    nl_section()
 
+
+def render_selected(cq: fuseki.CQ, target: str | None, graph: str, show_sparql: bool, explain_on: bool) -> None:
     st.divider()
     try:
         if cq.id in JUDGEMENT_CQS:
             render_judgement(cq, target, graph, show_sparql, explain_on)
+        elif cq.id in RANKING_CQS:
+            render_ranking(cq, target, graph, show_sparql)
         else:
             render_table(cq, target, show_sparql)
     except httpx.HTTPError as e:
         st.error(f"クエリ実行に失敗しました: {e}")
+
+
+def render_ranking(cq: fuseki.CQ, target: str, graph: str, show_sparql: bool) -> None:
+    """CQ07: 製品のロットに付いた Evidence を、根拠事実のサプライヤー・設備ごとに集計して順位付けする。"""
+    query = evidence.retarget(fuseki.bind_values(cq.text, cq.target_var, target), graph)
+    df = fuseki.select(query)
+    if df.empty:
+        st.markdown("### 原因候補: なし")
+        st.caption("この製品のロットには、サプライヤー・設備を根拠とする Evidence（R01・R02）がありません。")
+    else:
+        df["lotCount"] = df["lotCount"].astype(int)
+        # 該当ロット数の多い順。同数は同順位（SPARQL の ORDER BY と同じ並び）
+        df.insert(0, "順位", df["lotCount"].rank(method="min", ascending=False).astype(int))
+        st.markdown("### 原因候補（該当ロット数の多い順）")
+        for row in df.itertuples():
+            lots = row.lots.split()
+            label = f"{row.順位}位　{viz.local(row.cause)} {row.causeName or ''}（{row.causeType}）— {row.lotCount} ロット・{row.rules}"
+            with st.expander(label):
+                st.caption("ロットを押すと CQ06 でそのロットの根拠経路を開きます。")
+                for col, lot in zip(st.columns(min(len(lots), 6)), lots):
+                    col.button(viz.local(lot), key=f"cq07_{viz.local(row.cause)}_{viz.local(lot)}",
+                               on_click=open_in_cq06, args=(lot, graph), width="stretch")
+    st.caption("既存の Evidence（R01: サプライヤー、R02: 設備）の集計のみで、新たな判定は行っていません。"
+               "判定不能は除外。R07（設備起因疑い）は判定クエリが未実装のため含みません。"
+               f"参照した判定: {graph_label(graph)}")
+    if show_sparql:
+        with st.expander("実行した SPARQL"):
+            st.code(query, language="sparql")
+    with st.expander(f"結果テーブル（全列・{len(df)} 件）"):
+        st.dataframe(df.map(llm.compact), width="stretch", hide_index=True)
+
+
+def nl_section() -> None:
+    """自然文→SPARQL（APP_SPEC 第4節）。生成 SPARQL は必ず表示し、承認されてから実行する。
+
+    構文エラーまたは 0 件のときは、エラー内容を添えて1回だけ再生成する（再生成分も承認後に実行）。
+    2回失敗したらそこで止め、CQ からの選択を促す。
+    """
+    st.markdown("#### 自由入力（自然文 → SPARQL）")
+    if not llm.available():
+        st.caption("ANTHROPIC_API_KEY が未設定のため使えません。上の CQ から選んでください。")
+        return
+    question = st.text_input("質問", placeholder="例: 顧客ごとのクレーム件数を多い順に", key="nl_question")
+    state = st.session_state.get("nl")
+    if state and state["q"] != question:
+        state = st.session_state["nl"] = None
+
+    if st.button("SPARQL を生成", disabled=not question):
+        try:
+            sparql = llm.nl_to_sparql(question)
+        except (anthropic.APIError, RuntimeError) as e:
+            st.error(f"生成に失敗しました: {e}")
+            return
+        state = st.session_state["nl"] = {"q": question, "sparql": sparql, "attempt": 1, "status": "pending",
+                                          "errors": [], "df": None}
+    if not state:
+        return
+
+    if state["errors"]:
+        st.warning(f"1回目のクエリは失敗しました（{state['errors'][0]}）。再生成したクエリを確認してください。")
+    st.markdown(f"生成された SPARQL（{state['attempt']} 回目）")
+    st.code(state["sparql"], language="sparql")
+
+    if state["status"] == "pending" and st.button("承認して実行", type="primary"):
+        df, err = fuseki.try_select(state["sparql"])
+        if err is None:
+            state.update(status="done", df=df)
+        elif state["attempt"] == 1:
+            try:
+                sparql = llm.nl_to_sparql(question, previous=state["sparql"], error=err)
+            except (anthropic.APIError, RuntimeError) as e:
+                state.update(status="failed", errors=[err, f"再生成に失敗: {e}"])
+            else:
+                state.update(sparql=sparql, attempt=2, errors=[err])
+        else:
+            state.update(status="failed", errors=state["errors"] + [err], df=df)
+        st.rerun()  # 実行後は承認ボタンを消す
+
+    if state["status"] == "done":
+        st.markdown(f"**{len(state['df'])} 件**")
+        st.dataframe(state["df"].map(llm.compact), width="stretch", hide_index=True)
+    elif state["status"] == "failed":
+        st.error(f"2回とも失敗しました（{state['errors'][-1]}）。上の CQ から近い質問を選んでください。")
 
 
 def open_in_cq06(lot: str, graph: str) -> None:
@@ -275,7 +380,22 @@ def main() -> None:
             tab_whatif()
     if tab3.open:
         with tab3:
-            st.info("未実装（APP_SPEC.md 第7節 6）")
+            tab_graph()
+
+
+def tab_graph() -> None:
+    """タブ3: 投入状態の確認（グラフ別・クラス別の件数）。個体の周辺探索は未実装。"""
+    cols = st.columns(2)
+    with cols[0]:
+        st.markdown("#### グラフ別トリプル数")
+        graphs = fuseki.select(fuseki.load_query("app_graph_counts.rq"))
+        graphs["triples"] = graphs["triples"].astype(int)
+        st.dataframe(graphs, width="stretch", hide_index=True)
+        st.caption(f"{len(graphs)} グラフ・{graphs.triples.sum():,} トリプル（名前付きグラフのみ。スキーマは既定グラフ）")
+    with cols[1]:
+        st.markdown("#### クラス別インスタンス数")
+        classes = fuseki.select(fuseki.load_query("app_class_counts.rq"))
+        st.dataframe(classes.map(llm.compact), width="stretch", hide_index=True)
 
 
 main()

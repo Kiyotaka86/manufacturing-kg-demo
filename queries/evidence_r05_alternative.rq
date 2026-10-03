@@ -1,0 +1,79 @@
+# R05: R04（評価が閾値未満）に該当するサプライヤーが供給する部品について、
+#      同一規格（spec）の部品を供給し、不良率が閾値以下のサプライヤーを代替候補と判定する。
+#
+# 根拠経路: 現行サプライヤー ← 部品（partSuppliedBy）→ 規格（hasSpec）← 代替部品 → 代替サプライヤー
+#   evidenceSubject = 対象部品（R04 該当サプライヤーが供給する部品）
+#   evidenceFact    = 代替部品・代替サプライヤー・規格、および経路の起点として現行サプライヤー
+#                     （代替部品・代替サプライヤーは evidenceFact の下位プロパティ alternativePart /
+#                      alternativeSupplier でも記録し、現行サプライヤーと区別できるようにする。Reasoner は
+#                      使わないため evidenceFact も明示的に書く）
+#   分子・分母       = 代替サプライヤーの不良ロット数・総ロット数（R01 と同じ数え方）
+#   代替部品は同一規格の部品すべて（対象部品自身を含む。同じ部品を別サプライヤーから買う場合）。
+#   代替サプライヤーは現行サプライヤー以外。消費実績（ロット）が無いサプライヤーは不良率を計算できないため対象外。
+#   閾値・比較方向は data:rule/R04・R05 の threshold / comparison から読む。演算子をハードコードしない。
+#   partSuppliedBy は queries/materialize_part_supplier.rq が urn:derived:chains に実体化したショートカット。
+#
+# 1 Evidence = 1 組（対象部品, 代替部品, 代替サプライヤー）。結論は R05 の conclusion（代替候補）。
+# 推奨の強さ（順位や推奨度）は記録しない。
+#
+# what-if: ?thresholdOverride に値を入れると R05 の閾値の代わりに使う（UNDEF なら rules の値）。
+# 実行前に CLEAR SILENT GRAPH <urn:src:evidence> が必要（src/evidence.py がまとめて行う）。
+# USING は、データが名前付きグラフにあるため必須。
+PREFIX ex:   <http://example.org/kg/ontology#>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+INSERT {
+  GRAPH <urn:src:evidence> {
+    ?ev a ex:Evidence ;
+        ex:evidenceSubject ?part ;
+        ex:evidenceRule    ?rule ;
+        ex:evidenceFact    ?curSupplier , ?spec , ?altPart , ?altSupplier ;
+        ex:alternativePart ?altPart ;
+        ex:alternativeSupplier ?altSupplier ;
+        ex:observedValue   ?rate ;
+        ex:observedNumerator   ?defectLots ;
+        ex:observedDenominator ?totalLots ;
+        ex:appliedThreshold ?threshold ;
+        ex:conclusion      ?conclusion ;
+        ex:evaluatedAt     ?now .
+  }
+}
+USING <urn:x-arq:UnionGraph>
+WHERE {
+  VALUES ?thresholdOverride { UNDEF }  # what-if 用。アプリ層で差し替える
+
+  # 1. R04: 評価が閾値未満（比較方向は R04 の comparison）のサプライヤーと、その供給部品
+  ?r04 ex:rule_id "R04" ; ex:threshold ?r04Threshold ; ex:comparison ?r04Cmp .
+  ?curSupplier ex:rating ?rating .
+  FILTER((?r04Cmp = "gt" && ?rating >  ?r04Threshold) || (?r04Cmp = "ge" && ?rating >= ?r04Threshold) ||
+         (?r04Cmp = "lt" && ?rating <  ?r04Threshold) || (?r04Cmp = "le" && ?rating <= ?r04Threshold))
+  ?part ex:partSuppliedBy ?curSupplier ; ex:hasSpec ?spec .
+
+  # 2. 同一規格の部品と、それを供給する現行以外のサプライヤー
+  ?altPart ex:hasSpec ?spec ; ex:partSuppliedBy ?altSupplier .
+  FILTER(?altSupplier != ?curSupplier)
+
+  # 3. 代替サプライヤーの不良率（不良ロット数 / 消費ロット数）
+  {
+    SELECT ?altSupplier (COUNT(DISTINCT ?defLot) AS ?defectLots) (COUNT(DISTINCT ?anyLot) AS ?totalLots)
+    WHERE {
+      ?c ex:consumedInLot ?anyLot ; ex:consumedPurchase ?p .
+      ?p ex:purchasedFrom ?altSupplier .
+      OPTIONAL { ?d ex:defectLot ?anyLot . BIND(?anyLot AS ?defLot) }
+    }
+    GROUP BY ?altSupplier
+    HAVING (COUNT(DISTINCT ?anyLot) > 0)
+  }
+  BIND(xsd:decimal(?defectLots) / xsd:decimal(?totalLots) AS ?rate)
+
+  # 4. R05: 不良率を閾値と比較（比較方向は R05 の comparison）
+  ?rule ex:rule_id "R05" ; ex:threshold ?ruleThreshold ; ex:comparison ?cmp ; ex:conclusion ?conclusion .
+  BIND(COALESCE(?thresholdOverride, ?ruleThreshold) AS ?threshold)
+  FILTER((?cmp = "gt" && ?rate >  ?threshold) || (?cmp = "ge" && ?rate >= ?threshold) ||
+         (?cmp = "lt" && ?rate <  ?threshold) || (?cmp = "le" && ?rate <= ?threshold))
+
+  BIND(NOW() AS ?now)
+  BIND(IRI(CONCAT("http://example.org/kg/data/evidence/R05-",
+                  STRAFTER(STR(?part), "/part/"), "-", STRAFTER(STR(?altPart), "/part/"), "-",
+                  STRAFTER(STR(?altSupplier), "/supplier/"))) AS ?ev)
+}

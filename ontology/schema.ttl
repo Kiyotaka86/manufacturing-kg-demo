@@ -84,6 +84,10 @@ ex:defectCustomer a owl:ObjectProperty ; rdfs:domain ex:Defect ; rdfs:range ex:C
 ex:evidenceRule       a owl:ObjectProperty ; rdfs:domain ex:Evidence ; rdfs:range ex:Rule ; rdfs:label "適用ルール"@ja .
 ex:evidenceSubject    a owl:ObjectProperty ; rdfs:domain ex:Evidence ; rdfs:label "判定対象（Lot/Order/Part 等）"@ja .
 ex:evidenceFact       a owl:ObjectProperty ; rdfs:domain ex:Evidence ; rdfs:label "根拠事実ノード（複数可）"@ja .
+ex:alternativePart     a owl:ObjectProperty ; rdfs:subPropertyOf ex:evidenceFact ; rdfs:domain ex:Evidence ; rdfs:range ex:Part ;
+    rdfs:label "代替部品（R05 の根拠事実のうち代替候補の部品）"@ja .
+ex:alternativeSupplier a owl:ObjectProperty ; rdfs:subPropertyOf ex:evidenceFact ; rdfs:domain ex:Evidence ; rdfs:range ex:Supplier ;
+    rdfs:label "代替サプライヤー（R05 の根拠事実のうち代替候補のサプライヤー）"@ja .
 ex:ruleTargetClass    a owl:ObjectProperty ; rdfs:domain ex:Rule ; rdfs:range owl:Class ; rdfs:label "ルール適用クラス"@ja .
 
 # 推論用の短絡プロパティ（プロパティチェーンで導出、または投入時に実体化）
@@ -93,6 +97,9 @@ ex:lotUsesSupplier a owl:ObjectProperty ; rdfs:domain ex:Lot ; rdfs:range ex:Sup
 ex:lotMadeOn a owl:ObjectProperty ; rdfs:domain ex:Lot ; rdfs:range ex:Equipment ;
     rdfs:label "ロットの製造設備"@ja ;
     owl:propertyChainAxiom ( [ owl:inverseOf ex:opLot ] ex:opEquipment ) .
+ex:partSuppliedBy a owl:ObjectProperty ; rdfs:domain ex:Part ; rdfs:range ex:Supplier ;
+    rdfs:label "部品の供給元サプライヤー"@ja ;
+    owl:propertyChainAxiom ( [ owl:inverseOf ex:purchasedPart ] ex:purchasedFrom ) .
 
 # ---------------------------------------------------------------------
 # データタイププロパティ（列名をそのまま ex:<列名> にマッピング）
