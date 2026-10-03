@@ -50,6 +50,13 @@ def evidence_for(lot_iri: str) -> pd.DataFrame:
     return fuseki.select(query)
 
 
+def edges_for(evidence_iris: list[str]) -> pd.DataFrame:
+    """Evidence と根拠ノード間に実在するトリプル（列: s, p, o）。"""
+    template = fuseki.load_query("evidence_edges.rq")
+    frames = [fuseki.select(fuseki.bind_values(template, "evidence", iri)) for iri in evidence_iris]
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=["s", "p", "o"])
+
+
 def main() -> None:
     print(evaluate().to_string(index=False))
     if len(sys.argv) > 1:

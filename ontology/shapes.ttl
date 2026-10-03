@@ -97,7 +97,7 @@ ex:EvidenceShape a sh:NodeShape ; sh:targetClass ex:Evidence ;
                 [ sh:path ex:evidenceSubject ; sh:minCount 1 ; sh:maxCount 1 ] ,
                 [ sh:path ex:evidenceFact ; sh:minCount 1 ] ,
                 [ sh:path ex:conclusion ; sh:minCount 1 ] ,
-                [ sh:path ex:evaluatedAt ; sh:minCount 1 ; sh:datatype xsd:dateTime ] ;
+                [ sh:path ex:evaluatedAt ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:dateTime ] ;
     sh:sparql [ sh:message "根拠事実の日付が評価時点より後になっている（時系列矛盾）" ;
                 sh:select """SELECT $this ?fact WHERE {
                     $this ex:evaluatedAt ?t ; ex:evidenceFact ?fact .

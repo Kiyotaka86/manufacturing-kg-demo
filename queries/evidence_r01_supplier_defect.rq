@@ -22,15 +22,17 @@ INSERT {
         ex:evidenceRule    ?rule ;
         ex:evidenceFact    ?lp , ?pu , ?sup ;
         ex:observedValue   ?rate ;
+        ex:observedNumerator   ?defectLots ;
+        ex:observedDenominator ?totalLots ;
         ex:conclusion      ?conclusion ;
         ex:evaluatedAt     ?now .
   }
 }
 USING <urn:x-arq:UnionGraph>
 WHERE {
-  # 1. サプライヤー別の不良率を集計する
+  # 1. サプライヤー別に不良ロット数・総ロット数を集計し、不良率を出す（分子・分母も Evidence に残す）
   {
-    SELECT ?sup (xsd:decimal(COUNT(DISTINCT ?defLot)) / xsd:decimal(COUNT(DISTINCT ?anyLot)) AS ?rate)
+    SELECT ?sup (COUNT(DISTINCT ?defLot) AS ?defectLots) (COUNT(DISTINCT ?anyLot) AS ?totalLots)
     WHERE {
       ?c ex:consumedInLot ?anyLot ; ex:consumedPurchase ?p .
       ?p ex:purchasedFrom ?sup .
@@ -39,6 +41,7 @@ WHERE {
     GROUP BY ?sup
     HAVING (COUNT(DISTINCT ?anyLot) > 0)
   }
+  BIND(xsd:decimal(?defectLots) / xsd:decimal(?totalLots) AS ?rate)
 
   # 2. 閾値をルールから読み、超えたサプライヤーだけ残す
   ?rule ex:rule_id "R01" ; ex:threshold ?threshold ; ex:conclusion ?conclusion .

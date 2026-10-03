@@ -1,0 +1,19 @@
+# アプリ用: 根拠経路の描画に使うエッジ。Evidence とその根拠ノード（subject / rule / fact）の間に
+# 実在するトリプルだけを返す。描画側でエッジを作り足さない（経路＝グラフ上の実トリプル）。
+#   - Evidence → 各ノード（evidenceSubject / evidenceRule / evidenceFact）
+#   - 根拠ノード同士（consumedInLot, consumedPurchase, purchasedFrom, lotUsesSupplier など）
+PREFIX ex: <http://example.org/kg/ontology#>
+
+SELECT DISTINCT ?s ?p ?o WHERE {
+    VALUES ?evidence { <http://example.org/kg/data/evidence/R01-L0037> }  # アプリ層で差し替える
+    {
+        ?evidence ?p ?o .
+        FILTER(?p IN (ex:evidenceSubject, ex:evidenceRule, ex:evidenceFact))
+        BIND(?evidence AS ?s)
+    } UNION {
+        ?evidence ex:evidenceSubject|ex:evidenceFact|ex:evidenceRule ?s .
+        ?evidence ex:evidenceSubject|ex:evidenceFact|ex:evidenceRule ?o .
+        ?s ?p ?o .
+    }
+}
+ORDER BY ?s ?p ?o

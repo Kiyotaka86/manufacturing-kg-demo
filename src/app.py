@@ -1,32 +1,25 @@
 """ナレッジグラフ予行練習アプリ。起動: uv run streamlit run src/app.py
 
-現時点の実装範囲（APP_SPEC.md 第7節 1〜3）:
-- サイドバー: Fuseki 接続状態
-- タブ1: CQ01〜05 の実行とテーブル表示（対象は Fuseki から動的取得）
-判定系 CQ（06〜10）の根拠経路表示、タブ2・3 は後続段階で実装する。
+現時点の実装範囲（APP_SPEC.md 第7節 1〜5）:
+- サイドバー: Fuseki 接続状態、判定の再生成、表示オプション
+- タブ1: CQ01〜05 はテーブル表示。CQ06 は「判定 → 根拠経路グラフ → 説明文」
+タブ2・3、CQ07〜10、自然文→SPARQL は後続段階で実装する。
 """
 
+import json
+
+import anthropic
 import httpx
 import streamlit as st
 
+import evidence
 import fuseki
+import llm
+import viz
 
-# 根拠経路の描画（viz.py）ができるまでは、テーブル表示で完結する CQ だけを選べるようにする
 TABLE_ONLY_CQS = {"cq01", "cq02", "cq03", "cq04", "cq05"}
-
-PREFIXES = {
-    "http://example.org/kg/data/": "data:",
-    "http://example.org/kg/ontology#": "ex:",
-}
-
-
-def compact(value):
-    """表示用に IRI を接頭辞付きに短縮する。リテラルはそのまま返す。"""
-    if isinstance(value, str):
-        for ns, prefix in PREFIXES.items():
-            if value.startswith(ns):
-                return prefix + value[len(ns):]
-    return value
+# 判定系 CQ。CQ07〜10 は R01 以外の判定クエリ（queries/evidence_*.rq）が揃ってから追加する
+JUDGEMENT_CQS = {"cq06"}
 
 
 @st.cache_data(ttl=30, show_spinner=False)
@@ -40,7 +33,17 @@ def cached_targets(sample_iri: str) -> list[tuple[str, str]]:
     return [(row.s, f"{row.s.rsplit('/', 1)[-1]} {row.name or ''}".strip()) for row in df.itertuples()]
 
 
-def sidebar() -> tuple[fuseki.Status, bool]:
+@st.cache_data(show_spinner=False)
+def cached_names() -> list[str]:
+    return fuseki.select(fuseki.load_query("app_names.rq"))["name"].tolist()
+
+
+@st.cache_data(show_spinner="説明文を生成中…")
+def cached_explanation(payload_json: str) -> str:
+    return llm.explain(json.loads(payload_json))
+
+
+def sidebar() -> tuple[fuseki.Status, bool, bool]:
     with st.sidebar:
         st.subheader("Fuseki 接続状態")
         st.caption(fuseki.FUSEKI_URL)
@@ -54,15 +57,81 @@ def sidebar() -> tuple[fuseki.Status, bool]:
         if st.button("再読込"):
             st.cache_data.clear()
             st.rerun()
+        if status.ok and st.button("判定を再生成", help="urn:src:evidence を CLEAR し、全ルールで再判定する"):
+            counts = evidence.evaluate()
+            st.cache_data.clear()
+            st.toast("再判定: " + ", ".join(f"{r.rsplit('/', 1)[-1]} {n}件" for r, n in zip(counts.rule, counts.evidences)))
 
         st.divider()
         st.subheader("表示オプション")
         show_sparql = st.checkbox("SPARQL を表示", value=True)
-    return status, show_sparql
+        explain_on = st.checkbox("説明文を生成", value=llm.available(), disabled=not llm.available())
+        if not llm.available():
+            st.caption("ANTHROPIC_API_KEY が未設定のため説明文生成は無効")
+    return status, show_sparql, explain_on
 
 
-def tab_ask(show_sparql: bool) -> None:
-    cqs = {cq.id: cq for cq in fuseki.list_cqs() if cq.id in TABLE_ONLY_CQS}
+def render_table(cq: fuseki.CQ, target: str | None, show_sparql: bool) -> None:
+    query, df = fuseki.run_cq(cq, target)
+    st.markdown(f"**{len(df)} 件**")
+    if show_sparql:
+        with st.expander("実行した SPARQL"):
+            st.code(query, language="sparql")
+    # CQ01〜05 は結果テーブルが唯一の出力なので開いた状態で出す
+    with st.expander("結果テーブル（全列）", expanded=True):
+        st.dataframe(df.map(llm.compact), width="stretch", hide_index=True)
+
+
+def render_judgement(cq: fuseki.CQ, target: str, show_sparql: bool, explain_on: bool) -> None:
+    query, df = fuseki.run_cq(cq, target)
+    detail = evidence.evidence_for(target)
+
+    # 1. 判定（値は Evidence / Rule のトリプルをそのまま表示）
+    if detail.empty:
+        st.markdown("### 判定: 該当なし")
+        st.caption("urn:src:evidence にこの対象の Evidence がありません（R01 非該当）。")
+    else:
+        rule_names = detail[detail.role == "rule"].set_index("node")["name"]
+        for ev in detail.drop_duplicates("evidence").itertuples():
+            st.markdown(f"### 判定: {ev.conclusion}")
+            rule_iri = detail[(detail.evidence == ev.evidence) & (detail.role == "rule")].node.iloc[0]
+            st.markdown(f"{rule_names.get(rule_iri, '')} {viz.observed_text(ev)} — {ev.ruleId}")
+
+        # 2. 根拠経路
+        st.markdown("#### 根拠経路")
+        edges = evidence.edges_for(sorted(detail.evidence.unique()))
+        html, n_nodes = viz.render(detail, edges)
+        st.iframe(html, height=480)
+        st.caption(f"{n_nodes} ノード。濃青=判定対象 / 水色=根拠事実 / 橙=適用ルール / 紫=結論。エッジはすべて実在トリプル。")
+
+        # 3. 説明文
+        if explain_on:
+            st.markdown("#### 説明")
+            payload = llm.evidence_payload(detail, edges)
+            try:
+                text = cached_explanation(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+            except (anthropic.APIError, RuntimeError) as e:  # 説明文が無くても判定と経路は成立させる
+                st.warning(f"説明文を生成できませんでした: {e}")
+            else:
+                st.write(text)
+                issues = llm.audit(text, payload, cached_names())
+                for issue in issues:
+                    st.warning(f"自己点検: {issue}")
+                if not issues:
+                    st.caption("自己点検: 根拠外の ID・名前・数値、推測・提案表現は検出されませんでした。")
+
+    st.caption("CQ06 の結果テーブルには R02/R03 の行も含まれますが、Evidence 化済みは R01 のみのため、経路と説明は R01 に限ります。")
+    if show_sparql:
+        with st.expander("実行した SPARQL"):
+            st.code(query, language="sparql")
+    with st.expander(f"結果テーブル（全列・{len(df)} 件）"):
+        st.dataframe(df.map(llm.compact), width="stretch", hide_index=True)
+    with st.expander("Evidence の根拠ノード"):
+        st.dataframe(detail.map(llm.compact), width="stretch", hide_index=True)
+
+
+def tab_ask(show_sparql: bool, explain_on: bool) -> None:
+    cqs = {cq.id: cq for cq in fuseki.list_cqs() if cq.id in TABLE_ONLY_CQS | JUDGEMENT_CQS}
     cq = cqs[st.selectbox("CQ を選ぶ", list(cqs), format_func=lambda i: cqs[i].title)]
 
     target = None
@@ -75,31 +144,30 @@ def tab_ask(show_sparql: bool) -> None:
             f"対象を選ぶ（?{cq.target_var}）", iris, index=default, format_func=labels.get
         )
 
-    if not st.button("実行", type="primary"):
+    # 実行結果は選択が変わるまで保持する（チェックボックス操作などの再描画で消さない）
+    if st.button("実行", type="primary"):
+        st.session_state["last_run"] = (cq.id, target)
+    if st.session_state.get("last_run") != (cq.id, target):
         return
 
+    st.divider()
     try:
-        query, df = fuseki.run_cq(cq, target)
+        if cq.id in JUDGEMENT_CQS:
+            render_judgement(cq, target, show_sparql, explain_on)
+        else:
+            render_table(cq, target, show_sparql)
     except httpx.HTTPError as e:
         st.error(f"クエリ実行に失敗しました: {e}")
-        return
-
-    st.markdown(f"**{len(df)} 件**")
-    if show_sparql:
-        with st.expander("実行した SPARQL"):
-            st.code(query, language="sparql")
-    with st.expander("結果テーブル（全列）", expanded=True):
-        st.dataframe(df.map(compact), width="stretch", hide_index=True)
 
 
 def main() -> None:
     st.set_page_config(page_title="KG 予行練習", layout="wide")
-    status, show_sparql = sidebar()
+    status, show_sparql, explain_on = sidebar()
 
     tab1, tab2, tab3 = st.tabs(["質問する", "閾値を変える", "グラフを見る"])
     with tab1:
         if status.ok:
-            tab_ask(show_sparql)
+            tab_ask(show_sparql, explain_on)
         else:
             st.warning("Fuseki に接続できません。サイドバーの接続先を確認してください。")
     with tab2:

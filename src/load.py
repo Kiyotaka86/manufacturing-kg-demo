@@ -5,6 +5,7 @@
 3. TriG 内の名前付きグラフ（urn:src:<sheet名> ×16）を1つずつ GSP で投入
 4. queries/materialize_*.rq を実行し、propertyChainAxiom を urn:derived:chains に実体化
    （Fuseki の Reasoner は使わない）
+5. src/evidence.py で判定ルールを実行し、urn:src:evidence を CLEAR → 再生成する
 """
 
 import os
@@ -16,6 +17,8 @@ import httpx
 from dotenv import load_dotenv
 from rdflib import Dataset
 from SPARQLWrapper import JSON, SPARQLWrapper
+
+import evidence
 
 load_dotenv()
 
@@ -87,6 +90,12 @@ def materialize_property_chains() -> None:
         print(f"materialized {path.name}: {resp.status_code}")
 
 
+def evaluate_rules() -> None:
+    df = evidence.evaluate()
+    for row in df.itertuples():
+        print(f"evidence {row.rule.rsplit('/', 1)[-1]}: {row.evidences}")
+
+
 def report() -> None:
     sparql = SPARQLWrapper(f"{FUSEKI_URL}/query")
     sparql.setQuery(
@@ -103,6 +112,7 @@ def main() -> None:
     put_default_graph()
     put_named_graphs()
     materialize_property_chains()
+    evaluate_rules()
     report()
     print("OK")
 

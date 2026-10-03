@@ -1,18 +1,23 @@
 # アプリ用: 1 ロットに対する Evidence と根拠ノードの一覧（role = subject / rule / fact）
-# 結論（conclusion）・観測値（observedValue）・判定時刻（evaluatedAt）は Evidence ノードの値をそのまま返す
+# 結論・観測値（分子/分母）・閾値・判定時刻は Evidence と Rule の値をそのまま返す（再計算しない）
 PREFIX ex: <http://example.org/kg/ontology#>
 
-SELECT ?evidence ?role ?node ?type ?name ?observedValue ?conclusion ?evaluatedAt WHERE {
+SELECT ?evidence ?ruleId ?role ?node ?type ?name
+       ?observedValue ?numerator ?denominator ?threshold ?conclusion ?evaluatedAt
+WHERE {
     VALUES ?lot { <http://example.org/kg/data/lot/L0037> }  # アプリ層で差し替える
     GRAPH <urn:src:evidence> {
         ?evidence ex:evidenceSubject ?lot ;
+                  ex:evidenceRule    ?rule ;
                   ex:observedValue   ?observedValue ;
                   ex:conclusion      ?conclusion ;
                   ex:evaluatedAt     ?evaluatedAt .
+        OPTIONAL { ?evidence ex:observedNumerator ?numerator ; ex:observedDenominator ?denominator . }
         { ?evidence ex:evidenceSubject ?node . BIND("subject" AS ?role) }
         UNION { ?evidence ex:evidenceRule ?node . BIND("rule" AS ?role) }
         UNION { ?evidence ex:evidenceFact ?node . BIND("fact" AS ?role) }
     }
+    ?rule ex:rule_id ?ruleId ; ex:threshold ?threshold .
     OPTIONAL { ?node a ?type . FILTER(STRSTARTS(STR(?type), STR(ex:))) }
     OPTIONAL { ?node ?np ?name . FILTER(STRENDS(STR(?np), "_name")) }
 }

@@ -178,6 +178,10 @@ ex:conclusion     a owl:DatatypeProperty ; rdfs:range xsd:string ;
     rdfs:comment "Rule では想定結論、Evidence では実際の結論"@ja .
 ex:observedValue  a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:range xsd:decimal ;
     rdfs:comment "閾値と比較した実測値（例: 不良率 0.67）"@ja .
+ex:observedNumerator   a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:range xsd:integer ;
+    rdfs:comment "observedValue の分子（例: 不良ロット数 16）"@ja .
+ex:observedDenominator a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:range xsd:integer ;
+    rdfs:comment "observedValue の分母（例: 総ロット数 20）"@ja .
 ex:evaluatedAt    a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:range xsd:dateTime .
 ex:explanation    a owl:DatatypeProperty ; rdfs:domain ex:Evidence ; rdfs:range xsd:string ;
     rdfs:comment "Claude が生成した自然文の説明（任意）"@ja .

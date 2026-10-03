@@ -1,0 +1,2 @@
+# validate.py --fuseki 用: 全名前付きグラフ（evidence, derived:chains を含む）を1つのグラフとして取り出す
+CONSTRUCT { ?s ?p ?o } WHERE { GRAPH ?g { ?s ?p ?o } }

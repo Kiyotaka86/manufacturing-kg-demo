@@ -1,0 +1,5 @@
+# アプリ用: 説明文の自己点検（llm.audit）で使う、KG 上の全表示名（*_name の値）
+SELECT DISTINCT ?name WHERE {
+    ?s ?p ?name .
+    FILTER(STRENDS(STR(?p), "_name"))
+}
