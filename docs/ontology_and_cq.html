@@ -178,15 +178,15 @@ aside .learn{background:var(--hl-soft);border-radius:8px;padding:8px 10px;font-s
 </tbody></table></div>
 <p>これは「ルールの記述と実装を照合する工程を設ける」という持ち帰り事項が、ルールだけでなく CQ にも当てはまることを示している。</p>
 
-<h2>本番（トレーディング）との対応</h2>
-<p>4つの種類は、ドメインが変わっても同じ型で使える。</p>
+<h2>他ドメインへの当てはめ</h2>
+<p>4つの種類は、ドメインが変わっても同じ型で使える。取引や価格判断を扱う業務に当てはめると次のようになる。</p>
 <div class="tbl"><table>
-<thead><tr><th>種類</th><th>製造デモ</th><th>トレーディングでの例</th></tr></thead>
+<thead><tr><th>種類</th><th>製造デモ</th><th>取引・価格判断での例</th></tr></thead>
 <tbody>
-<tr><td><span class="tag t1">辿る</span></td><td>部品 → ロット → 顧客</td><td>顧客 → 過去取引 → 銘柄・相場条件</td></tr>
-<tr><td><span class="tag t2">数える</span></td><td>サプライヤー別の不良率</td><td>顧客別の成約率、条件別のスプレッド</td></tr>
-<tr><td><span class="tag t3">判断する</span></td><td>ロットは要注意か、なぜか</td><td>このオファー水準は妥当か、なぜか</td></tr>
-<tr><td><span class="tag t4">基準を問う</span></td><td>閾値を変えたら判定はどう変わるか</td><td>強気度の基準を変えたら推奨はどう変わるか</td></tr>
+<tr><td><span class="tag t1">辿る</span></td><td>部品 → ロット → 顧客</td><td>顧客 → 過去の取引 → 商品・市況条件</td></tr>
+<tr><td><span class="tag t2">数える</span></td><td>サプライヤー別の不良率</td><td>顧客別の成約率、条件別の価格差</td></tr>
+<tr><td><span class="tag t3">判断する</span></td><td>ロットは要注意か、なぜか</td><td>この提示価格は妥当か、なぜか</td></tr>
+<tr><td><span class="tag t4">基準を問う</span></td><td>閾値を変えたら判定はどう変わるか</td><td>判断基準を変えたら推奨はどう変わるか</td></tr>
 </tbody></table></div>
 
 <p class="foot">名前空間は仮（<code>ex: = http://example.org/kg/ontology#</code>）。スキーマは <code>urn:schema:kg</code>、事実データとルールはシートごとに <code>urn:src:&lt;シート名&gt;</code>（16グラフ）、導出プロパティは <code>urn:derived:chains</code>、判定結果は <code>urn:src:evidence</code>（what-if は <code>urn:whatif:evidence</code>）に格納。CQ の経路は各クエリが使うプロパティから描いている。クラス・属性・CQ の経路・数値は、リポジトリの <code>ontology/schema.ttl</code>・<code>queries/*.rq</code> と Fuseki 上のデータに照合済み（2026-10-04、合成データ <code>data/kg_toolkit.xlsx</code>）。CQ09 はアプリでは未実装。</p>
