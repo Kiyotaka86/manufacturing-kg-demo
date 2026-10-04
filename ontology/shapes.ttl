@@ -3,7 +3,7 @@
 @prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 
-# SHACL 形状（第1版）: 必須項目・参照整合性・値域。Evidence の時系列整合性を含む。
+# SHACL 形状（第1版）: 必須項目・参照整合性・値域。Evidence の時系列整合性（評価時点・判定の基準日）を含む。
 
 ex:ProductShape a sh:NodeShape ; sh:targetClass ex:Product ;
     sh:property [ sh:path ex:product_id ; sh:minCount 1 ; sh:maxCount 1 ; sh:datatype xsd:string ] ,
@@ -93,7 +93,14 @@ ex:RuleShape a sh:NodeShape ; sh:targetClass ex:Rule ;
                 [ sh:path ex:comparison ; sh:maxCount 1 ; sh:in ( "gt" "ge" "lt" "le" ) ] ,
                 [ sh:path ex:min_denominator ; sh:maxCount 1 ; sh:datatype xsd:integer ; sh:minInclusive 1 ] .
 
-# 説明層: 結論には必ずルールと1件以上の根拠が付き、根拠事実は評価時点より前の日付を持つ
+# 説明層: 結論には必ずルールと1件以上の根拠が付き、根拠事実は評価時点より前の日付を持つ。
+# 時系列の比較では、日付・日時を比較前にタイムゾーン付きの xsd:dateTime に正規化する。
+#   - xsd:date はその日の 00:00:00 とみなす（評価と同じ日の事実は矛盾としない）
+#   - タイムゾーンの無い値は国内工場の現地時刻とみなし +09:00 を補う（xlsx 由来の日時はタイムゾーンを持たない）
+# 正規化しないと、xsd:date → xsd:dateTime の変換やタイムゾーン有無の混在した比較が rdflib でエラーになり、
+# FILTER がエラーを偽として扱うため違反が黙って見逃される。
+# ロットを対象とする判定（R01・R02）では、根拠の保全・購買がロットの製造開始日以前であることも確かめる
+# （判定の基準日より後の事実を根拠にしていないこと）。検査・工程は製造開始後に起きるのが正常なので対象外。
 ex:EvidenceShape a sh:NodeShape ; sh:targetClass ex:Evidence ;
     sh:property [ sh:path ex:evidenceRule ; sh:minCount 1 ; sh:maxCount 1 ; sh:class ex:Rule ] ,
                 [ sh:path ex:evidenceSubject ; sh:minCount 1 ; sh:maxCount 1 ] ,
@@ -108,7 +115,19 @@ ex:EvidenceShape a sh:NodeShape ; sh:targetClass ex:Evidence ;
                 sh:select """SELECT $this WHERE { $this ex:conclusion ?c . FILTER(?c != "判定不能")
                     FILTER NOT EXISTS { $this ex:observedNumerator ?n } }""" ] ,
               [ sh:message "根拠事実の日付が評価時点より後になっている（時系列矛盾）" ;
-                sh:select """SELECT $this ?fact WHERE {
+                sh:select """SELECT $this ?fact ?p ?d WHERE {
                     $this ex:evaluatedAt ?t ; ex:evidenceFact ?fact .
-                    ?fact ?p ?d . FILTER(datatype(?d) = xsd:date || datatype(?d) = xsd:dateTime)
-                    FILTER(xsd:dateTime(?d) > ?t) }""" ] .
+                    # FILTER はグループの最後に効くため、日付型への絞り込みは内側のグループで先に行う
+                    # （外に書くと、ID などの文字列にも STRDT が走り rdflib が変換エラーを大量に出す）
+                    { ?fact ?p ?d . FILTER(datatype(?d) = xsd:date || datatype(?d) = xsd:dateTime) }
+                    BIND(IF(datatype(?d) = xsd:date, CONCAT(STR(?d), "T00:00:00"), STR(?d)) AS ?ds)
+                    BIND(STRDT(IF(REGEX(?ds, "(Z|[+-][0-9]{2}:[0-9]{2})$"), ?ds, CONCAT(?ds, "+09:00")), xsd:dateTime) AS ?dn)
+                    BIND(STR(?t) AS ?ts)
+                    BIND(STRDT(IF(REGEX(?ts, "(Z|[+-][0-9]{2}:[0-9]{2})$"), ?ts, CONCAT(?ts, "+09:00")), xsd:dateTime) AS ?tn)
+                    FILTER(?dn > ?tn) }""" ] ,
+              [ sh:message "ロットを対象とする判定の根拠のうち、保全・購買はロットの製造開始日以前であること" ;
+                sh:select """SELECT $this ?fact ?d WHERE {
+                    $this ex:evidenceSubject ?lot ; ex:evidenceFact ?fact .
+                    ?lot a ex:Lot ; ex:start_date ?start .
+                    { ?fact a ex:Maintenance ; ex:maint_date ?d } UNION { ?fact a ex:Purchase ; ex:purchase_date ?d }
+                    FILTER(?d > ?start) }""" ] .

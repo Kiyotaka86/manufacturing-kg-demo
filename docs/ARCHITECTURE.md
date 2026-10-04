@@ -22,6 +22,7 @@ flowchart LR
         LOAD["Graph Store Protocol<br/>で PUT"]
         MAT["queries/materialize_*.rq<br/>導出プロパティの実体化"]
         EVAL["src/evidence.py<br/>queries/evidence_r0*.rq"]
+        VAL2{"SHACL 検証<br/>Evidence を含む全グラフ<br/>（根拠の有無・時系列）"}
     end
 
     subgraph FUSEKI["Apache Jena Fuseki（TDB2, :3030/kg）"]
@@ -48,6 +49,8 @@ flowchart LR
     LOAD --> KG
     MAT --> KG
     EVAL --> KG
+    KG --> VAL2
+    VAL2 -. "違反: exit 1" .-> STOP
 
     USER --> UI
     USER --> DOCS
@@ -63,6 +66,7 @@ flowchart LR
 | `src/load.py` | スキーマと 16 グラフを投入し、実体化と判定まで一括で実行する | Fuseki の Reasoner は使わない |
 | `queries/` | CQ・判定・実体化・アプリ用の SPARQL をすべて置く | SPARQL を Python に埋め込まない。対象は `VALUES` 行を差し替える |
 | `src/evidence.py` | 判定クエリを実行し、結果を `ex:Evidence` として書き戻す | CLEAR と INSERT を1リクエスト（1トランザクション）で実行する |
+| `src/validate.py` | 判定後に Fuseki 上の全グラフを SHACL で検証する（`load.py` の最後でも実行する） | Evidence に根拠が付いていること、根拠事実の日付が評価時点より前であること、ロット判定の根拠の保全・購買が製造開始日以前であることを確かめる |
 | `src/llm.py` | 根拠経路の三つ組から説明文を作る。自然文から SPARQL を作る | 数値計算と判定は LLM にさせない。生成した説明文は `audit()` で根拠データと突き合わせる。生成した SPARQL は承認後にだけ実行する |
 | Claude API | 上記 2 つの生成だけを担う | API キーがなくても、判定・経路グラフ・what-if は動く |
 

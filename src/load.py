@@ -9,6 +9,8 @@
    （Fuseki の Reasoner は使わない）
 5. src/evidence.py で判定ルールを実行し、urn:src:evidence を CLEAR → 再生成する。
    タブ2 の what-if 結果（urn:whatif:evidence）は前回の残りなので消す
+6. Fuseki 上の全名前付きグラフ（Evidence を含む）を SHACL 検証する（非準拠なら exit 1）。
+   1 の検証は xlsx 由来の事実だけが対象のため、Evidence の制約（根拠の有無・時系列）はここで確かめる
 """
 
 import os
@@ -22,6 +24,7 @@ from rdflib import Dataset
 from SPARQLWrapper import JSON, SPARQLWrapper
 
 import evidence
+import validate
 
 load_dotenv()
 
@@ -111,6 +114,13 @@ def evaluate_rules() -> None:
         print(f"evidence {row.rule.rsplit('/', 1)[-1]} {row.conclusion}: {row.evidences}")
 
 
+def validate_graphs() -> None:
+    if not validate.check(validate.load_fuseki()):
+        print("ERROR: Fuseki 上のグラフが SHACL に準拠していません。Evidence は書き込み済みのため、"
+              "違反内容（判定クエリまたはデータ）を確認してください。", file=sys.stderr)
+        sys.exit(1)
+
+
 def report() -> None:
     sparql = SPARQLWrapper(f"{FUSEKI_URL}/query")
     sparql.setQuery(
@@ -128,6 +138,7 @@ def main() -> None:
     put_named_graphs()
     materialize_property_chains()
     evaluate_rules()
+    validate_graphs()
     report()
     print("OK")
 

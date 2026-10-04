@@ -27,7 +27,7 @@ uv run scripts/check_fuseki.py
 
 ### 1-2. データ投入（ターミナル B）
 
-通常は次の1コマンドでよい。変換 → SHACL 検証 → 投入 → 導出プロパティの実体化 → 判定、までを順に実行する。
+通常は次の1コマンドでよい。変換 → SHACL 検証 → 投入 → 導出プロパティの実体化 → 判定 → 判定結果を含む全グラフの SHACL 検証、までを順に実行する。
 
 ```bash
 uv run src/load.py
@@ -50,6 +50,7 @@ evidence R02 判定不能: 18
 evidence R02 要注意: 20
 evidence R03 出荷保留: 17
 evidence R05 代替候補: 1
+SHACL conforms: True        ← 判定後、Fuseki 上の全グラフ（Evidence を含む）の検証
 named graphs: 19, triples in named graphs: 6968
 OK
 ```
@@ -172,5 +173,6 @@ CQ10 は単体のクエリ（`queries/cq10.rq`）としても残っているが�
 | 説明文が出ない、自由入力が使えない（「ANTHROPIC_API_KEY が未設定のため…」） | API キー未設定 | `.env` に `ANTHROPIC_API_KEY=` を記入して Streamlit を再起動する。キーがなくても判定・経路グラフ・閾値変更は動くので、デモはそのまま続けられる |
 | 説明文の生成でエラー | API キーが無効、またはネットワーク不通 | サイドバーの「説明文を生成」をオフにして続ける |
 | `load.py` が `SHACL conforms: False` の後、違反レポートを出して止まる | xlsx の値が `ontology/shapes.ttl` の制約に違反している（必須値の欠落、型・参照先の誤りなど） | 投入は行われず、Fuseki は前回の状態のまま。レポートの `Focus Node`・`Result Path`・`Message` で該当シートの行と列を特定し、`data/kg_toolkit.xlsx` を直してから再実行する |
+| `load.py` が判定の後で `SHACL conforms: False` を出して止まる | 判定結果（Evidence）が制約に違反している。根拠の欠落、または時系列の矛盾（根拠事実の日付が評価時点より後、ロット判定の根拠の保全・購買が製造開始日より後） | Evidence は書き込み済み。違反レポートの `Message` と `Focus Node`（Evidence の IRI）から該当ルールの判定クエリ `queries/evidence_r0*.rq` かデータを直し、再実行する。`uv run src/validate.py --fuseki` で再確認できる |
 | CQ の結果が手順書と違う | 前回の what-if が残っている、または判定が古い | サイドバーの「判定を再生成」を押すか、`uv run src/load.py` を再実行する |
 | Fuseki が `TDB2` のロックエラーで起動しない | 別の Fuseki プロセスが同じ `run/databases/kg` を開いている | 既存プロセスを止めてから起動する（`lsof -iTCP:3030 -sTCP:LISTEN` で PID を確認する） |

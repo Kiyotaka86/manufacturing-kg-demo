@@ -26,6 +26,7 @@ flowchart LR
         LOAD["Graph Store Protocol<br/>で PUT"]
         MAT["queries/materialize_*.rq<br/>導出プロパティの実体化"]
         EVAL["src/evidence.py<br/>queries/evidence_r0*.rq"]
+        VAL2{"SHACL 検証<br/>Evidence を含む全グラフ<br/>（根拠の有無・時系列）"}
     end
 
     subgraph FUSEKI["Apache Jena Fuseki（TDB2, :3030/kg）"]
@@ -52,6 +53,8 @@ flowchart LR
     LOAD --> KG
     MAT --> KG
     EVAL --> KG
+    KG --> VAL2
+    VAL2 -. "違反: exit 1" .-> STOP
 
     USER --> UI
     USER --> DOCS
@@ -141,7 +144,7 @@ uv run streamlit run src/app.py
 
 | コマンド | 内容 |
 | --- | --- |
-| `uv run src/load.py` | 変換 → SHACL 検証 → 投入 → 導出プロパティの実体化 → 判定、を一括で実行する |
+| `uv run src/load.py` | 変換 → SHACL 検証 → 投入 → 導出プロパティの実体化 → 判定 → 判定結果を含む全グラフの SHACL 検証、を一括で実行する |
 | `uv run src/validate.py [--fuseki]` | SHACL 検証だけを行う（`--fuseki` なら Fuseki 上の全グラフを検証） |
 | `uv run src/evidence.py [L0003]` | 判定だけをやり直す（ロット ID を渡すとその Evidence を表示） |
 | `uv run src/run_cq.py cq06 http://example.org/kg/data/lot/L0003` | CQ をコマンドラインで実行する |
