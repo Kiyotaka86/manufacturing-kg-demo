@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>オントロジーとCQの読み方</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F4; --paper:#FFFFFF; --ink:#14213D; --ink-2:#4A5568; --line:#CBD2DA;
+  --master:#DCEBF7; --master-st:#2B5C8A;
+  --record:#D8EEF0; --record-st:#0E7C86;
+  --explain:#EAE4F6; --explain-st:#5B3E9A;
+  --rule:#FBEBD3; --rule-st:#B8690C;
+  --edge:#5B6B7E; --chain:#9B2C6B; --hl:#E07A1F; --hl-soft:#FCE9D6;
+  --t1:#2B5C8A; --t2:#0E7C86; --t3:#5B3E9A; --t4:#B8690C;
+  --sans:"IBM Plex Sans JP",system-ui,-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1720; --paper:#16202B; --ink:#E6EDF3; --ink-2:#A7B3C2; --line:#2B3947;
+    --master:#16304A; --master-st:#7FB3E0; --record:#12333A; --record-st:#4FC3CC;
+    --explain:#2A2140; --explain-st:#B49BE8; --rule:#3A2A12; --rule-st:#E0A04A;
+    --edge:#8A9AAD; --chain:#E07AB4; --hl:#F2A35A; --hl-soft:#3A2814;
+    --t1:#7FB3E0; --t2:#4FC3CC; --t3:#B49BE8; --t4:#E0A04A;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1720; --paper:#16202B; --ink:#E6EDF3; --ink-2:#A7B3C2; --line:#2B3947;
+  --master:#16304A; --master-st:#7FB3E0; --record:#12333A; --record-st:#4FC3CC;
+  --explain:#2A2140; --explain-st:#B49BE8; --rule:#3A2A12; --rule-st:#E0A04A;
+  --edge:#8A9AAD; --chain:#E07AB4; --hl:#F2A35A; --hl-soft:#3A2814;
+  --t1:#7FB3E0; --t2:#4FC3CC; --t3:#B49BE8; --t4:#E0A04A;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.75}
+.wrap{max-width:1440px;margin:0 auto;padding:44px 16px 72px}
+h1{font-size:1.75rem;font-weight:600;margin:0 0 10px;line-height:1.35}
+h2{font-size:1.25rem;font-weight:600;margin:52px 0 10px;padding-top:10px;border-top:1px solid var(--line)}
+h3{font-size:1rem;font-weight:600;margin:0}
+p{margin:0 0 12px;max-width:80ch}
+code{font-family:var(--mono);font-size:.85em}
+.lede{color:var(--ink-2);font-size:1.02rem}
+.story{background:var(--paper);border:1px solid var(--line);border-left:5px solid var(--hl);border-radius:10px;padding:16px 20px;margin:20px 0 0;max-width:90ch}
+.story p{margin:0;font-size:1.05rem;font-weight:500}
+.story .s{color:var(--ink-2);font-size:.9rem;font-weight:400;margin-top:6px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin:10px 0 16px;background:var(--paper)}
+table{border-collapse:collapse;width:100%;font-size:.92rem;min-width:640px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600;color:var(--ink-2);background:color-mix(in srgb,var(--bg) 55%,var(--paper))}
+tr:last-child td{border-bottom:0}
+.tag{display:inline-block;font-size:.78rem;font-weight:600;padding:1px 9px;border-radius:999px;color:#fff;white-space:nowrap}
+.tag.t1{background:var(--t1)}.tag.t2{background:var(--t2)}.tag.t3{background:var(--t3)}.tag.t4{background:var(--t4)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .tag{color:#0F1720}}
+:root[data-theme="dark"] .tag{color:#0F1720}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.chip{font-family:var(--sans);font-size:.85rem;border:1.5px solid var(--line);background:var(--paper);color:var(--ink);border-radius:999px;padding:4px 12px;cursor:pointer}
+.chip:hover{border-color:var(--hl)}
+.chip[aria-pressed="true"]{background:var(--hl-soft);border-color:var(--hl);font-weight:600}
+.chip .n{font-family:var(--mono);font-size:.78rem;color:var(--ink-2);margin-right:4px}
+.bar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin:0 0 10px;font-size:.84rem;color:var(--ink-2)}
+.bar label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+.key{display:inline-flex;align-items:center;gap:6px}
+.sw{width:13px;height:13px;border-radius:3px;border:1.5px solid}
+.sw.m{background:var(--master);border-color:var(--master-st)}
+.sw.r{background:var(--record);border-color:var(--record-st)}
+.sw.e{background:var(--explain);border-color:var(--explain-st)}
+.sw.u{background:var(--rule);border-color:var(--rule-st)}
+.ln{width:22px;height:0;border-top:2px solid var(--edge)}
+.ln.c{border-top:2px dashed var(--chain)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+@media (max-width:1040px){.grid{grid-template-columns:minmax(0,1fr)}}
+.canvas{background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow-x:auto}
+svg{display:block;min-width:960px;width:100%;height:auto}
+.node rect{stroke-width:1.6;rx:8;cursor:pointer}
+.node.m rect{fill:var(--master);stroke:var(--master-st)}
+.node.r rect{fill:var(--record);stroke:var(--record-st)}
+.node.e rect{fill:var(--explain);stroke:var(--explain-st)}
+.node.u rect{fill:var(--rule);stroke:var(--rule-st)}
+.node .en{font-family:var(--mono);font-size:13px;font-weight:500;fill:var(--ink)}
+.node .ja{font-size:11.5px;fill:var(--ink-2)}
+.node.sel rect{stroke:var(--hl);stroke-width:3}
+.node.dim{opacity:.25}
+.edge path{fill:none;stroke:var(--edge);stroke-width:1.5}
+.edge.chain path{stroke:var(--chain);stroke-dasharray:6 4}
+.edge text{font-family:var(--mono);font-size:10.5px;fill:var(--ink-2)}
+.edge .lbg{fill:var(--paper)}
+.edge.hl path{stroke:var(--hl);stroke-width:2.8}
+.edge.hl text{fill:var(--ink);font-weight:500}
+.edge.dim{opacity:.12}
+.zone{fill:none;stroke:var(--line);stroke-width:1.5;stroke-dasharray:8 6}
+.zlabel{font-size:12px;fill:var(--ink-2);font-weight:500}
+aside{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow-y:auto}
+aside h3{font-size:1.05rem;margin:4px 0 2px}
+aside .sub{color:var(--ink-2);font-size:.86rem;margin:0 0 8px}
+aside h4{font-size:.78rem;letter-spacing:.04em;color:var(--ink-2);margin:14px 0 4px;font-weight:600}
+aside ul{margin:0;padding:0;list-style:none;font-size:.86rem}
+aside li{padding:3px 0;border-bottom:1px solid var(--line)}
+aside li:last-child{border-bottom:0}
+aside p{font-size:.88rem;margin:0 0 6px}
+aside .learn{background:var(--hl-soft);border-radius:8px;padding:8px 10px;font-size:.88rem}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px;margin:10px 0 0}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column}
+.card.unimpl{opacity:.62;border-style:dashed}
+.card.focus{border-color:var(--hl);box-shadow:0 0 0 2px var(--hl-soft)}
+.card .hd{display:flex;gap:8px;align-items:center;margin:0 0 6px;flex-wrap:wrap}
+.card .id{font-family:var(--mono);font-size:.85rem;color:var(--ink-2)}
+.card .q{font-size:.92rem;margin:4px 0 8px}
+.card dl{margin:0;font-size:.88rem}
+.card dt{font-weight:600;color:var(--ink-2);font-size:.78rem;letter-spacing:.04em;margin:8px 0 2px}
+.card dd{margin:0}
+.card dd ul{margin:2px 0 0;padding-left:18px}
+.card .learn{background:var(--hl-soft);border-radius:8px;padding:8px 10px;margin-top:10px;font-size:.88rem}
+.card button{margin-top:auto;align-self:flex-start;font-family:var(--sans);font-size:.82rem;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:6px;padding:4px 10px;cursor:pointer;margin-top:12px}
+.card button:hover{border-color:var(--hl)}
+.foot{font-size:.84rem;color:var(--ink-2);margin:18px 0 0;max-width:95ch}
+:focus-visible{outline:2px solid var(--hl);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>オントロジーとコンピテンシークエスチョンの読み方</h1>
+  <p class="lede">製造・品質トレーサビリティの予行練習デモで、オントロジーが何を表し、各 CQ がそのどこを辿り、何が分かるのかを一枚にまとめたもの。</p>
+  <div class="story">
+    <p>評価の低いサプライヤー S005（ミナト金属）の部品が使われている。どこに使われ、誰に届き、何が起き、どう判断し、どうすべきか。</p>
+    <p class="s">デモの CQ はすべて、この一つの問いに順番に答えている。</p>
+  </div>
+</header>
+
+<h2>CQ の4つの種類</h2>
+<p>CQ は答え方で4種類に分かれる。本番の価値仮説「なぜその結論に至ったかを説明できる」に直接対応するのは「判断する」と「基準を問う」。「辿る」「数える」は、その判断の材料をグラフから取り出せることを示す前段にあたる。</p>
+<div class="tbl"><table>
+<thead><tr><th>種類</th><th>CQ</th><th>答えの形</th><th>分かること</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t1">辿る</span></td><td>01〜03</td><td>結果テーブル</td><td>事実がどう繋がっているか</td></tr>
+<tr><td><span class="tag t2">数える</span></td><td>04〜05</td><td>集計テーブル</td><td>どこに問題が集中しているか</td></tr>
+<tr><td><span class="tag t3">判断する</span></td><td>06〜08（09 は未実装）</td><td>経路グラフ＋説明文</td><td>なぜその結論か</td></tr>
+<tr><td><span class="tag t4">基準を問う</span></td><td>10（タブ2）</td><td>判定の差分一覧</td><td>その結論は基準次第でどう変わるか</td></tr>
+</tbody></table></div>
+
+<h2 id="diagram">オントロジー概念図と CQ の経路</h2>
+<p>CQ を選ぶと、その CQ が辿るクラスと関係が図上で強調される。クラスをクリックすると、属性と接続する関係を表示する。</p>
+<div class="chips" id="chips" role="group" aria-label="CQ を選ぶ"></div>
+<div class="bar">
+  <span class="key"><span class="sw m"></span>マスタ</span>
+  <span class="key"><span class="sw r"></span>関係・実績レコード</span>
+  <span class="key"><span class="sw e"></span>判定根拠</span>
+  <span class="key"><span class="sw u"></span>判断ルール</span>
+  <span class="key"><span class="ln"></span>オブジェクトプロパティ</span>
+  <span class="key"><span class="ln c"></span>導出プロパティ（チェーン）</span>
+  <label><input type="checkbox" id="tgChain" checked> 導出プロパティを表示</label>
+</div>
+<div class="grid">
+  <div class="canvas"><svg id="g" viewBox="0 0 1400 700" role="img" aria-label="オントロジーのクラスと関係"></svg></div>
+  <aside id="panel" aria-live="polite"></aside>
+</div>
+
+<h2 id="cqs">各 CQ の問い・見えるもの・分かること</h2>
+<div class="cards" id="cards"></div>
+
+<h2 id="gaps">問いと実装の食い違い</h2>
+<p>各 CQ のクエリ（<code>queries/cq*.rq</code>）を読み合わせた結果、冒頭コメントの問いと実装が一致していない箇所がある。説明は実装に合わせて記載しているが、デモで問いを読み上げる場合は以下に注意する。</p>
+<div class="tbl"><table>
+<thead><tr><th>CQ</th><th>問い</th><th>実装</th><th>デモでの扱い</th></tr></thead>
+<tbody>
+<tr><td>CQ02</td><td>ロット・工程・部品・サプライヤーに遡る</td><td>出力はクレーム・ロット・設備・供給元のみ</td><td>「設備と供給元まで遡る」と説明する</td></tr>
+<tr><td>CQ03</td><td>出荷済みの顧客</td><td><code>ship_date</code> を条件にしておらず、未出荷の受注も拾いうる。全60件中3件が未出荷</td><td>S005 では未出荷の3件は該当せず、結果はすべて出荷済み。そのまま見せてよい</td></tr>
+<tr><td>CQ04</td><td>直近3ロットの不良率</td><td>全ロットで集計。分子はクレーム件数のため不良率が 1 を超える行がある（S001×PT024 で 2.0）。比較は <code>&gt;=</code> 固定で、ルールの比較方向・最小標本数を使っていない</td><td>判定ではなく傾向の表として見せる。判定は CQ06 に任せる</td></tr>
+<tr><td>CQ05</td><td>平均日数</td><td>SPARQL は保全ごとの次の不良日を返し、平均はそのテーブルから外で計算している</td><td>問いには答えている。ただし「計算は SPARQL で完結させる」方針の例外になる</td></tr>
+<tr><td>CQ08</td><td>サプライヤーの代替候補</td><td>対象は部品。既定値 PT013 は候補0件</td><td>PT014 を選んで見せる</td></tr>
+<tr><td>CQ10</td><td>閾値変更で判定が変わるロット</td><td>単体クエリは比較 <code>&gt;=</code> 固定でアプリ未使用。既定 0.10 では全サプライヤーが閾値を大きく上回り0件。タブ2が役割を担う</td><td>タブ2で見せる</td></tr>
+</tbody></table></div>
+<p>これは「ルールの記述と実装を照合する工程を設ける」という持ち帰り事項が、ルールだけでなく CQ にも当てはまることを示している。</p>
+
+<h2>本番（トレーディング）との対応</h2>
+<p>4つの種類は、ドメインが変わっても同じ型で使える。</p>
+<div class="tbl"><table>
+<thead><tr><th>種類</th><th>製造デモ</th><th>トレーディングでの例</th></tr></thead>
+<tbody>
+<tr><td><span class="tag t1">辿る</span></td><td>部品 → ロット → 顧客</td><td>顧客 → 過去取引 → 銘柄・相場条件</td></tr>
+<tr><td><span class="tag t2">数える</span></td><td>サプライヤー別の不良率</td><td>顧客別の成約率、条件別のスプレッド</td></tr>
+<tr><td><span class="tag t3">判断する</span></td><td>ロットは要注意か、なぜか</td><td>このオファー水準は妥当か、なぜか</td></tr>
+<tr><td><span class="tag t4">基準を問う</span></td><td>閾値を変えたら判定はどう変わるか</td><td>強気度の基準を変えたら推奨はどう変わるか</td></tr>
+</tbody></table></div>
+
+<p class="foot">名前空間は仮（<code>ex: = http://example.org/kg/ontology#</code>）。スキーマは <code>urn:schema:kg</code>、事実データとルールはシートごとに <code>urn:src:&lt;シート名&gt;</code>（16グラフ）、導出プロパティは <code>urn:derived:chains</code>、判定結果は <code>urn:src:evidence</code>（what-if は <code>urn:whatif:evidence</code>）に格納。CQ の経路は各クエリが使うプロパティから描いている。クラス・属性・CQ の経路・数値は、リポジトリの <code>ontology/schema.ttl</code>・<code>queries/*.rq</code> と Fuseki 上のデータに照合済み（2026-10-04、合成データ <code>data/kg_toolkit.xlsx</code>）。CQ09 はアプリでは未実装。</p>
+</div>
+
+<script>
+const W = 150, H = 50;
+const C = {
+  Supplier:{x:160,y:110,t:"m",ja:"サプライヤー",attrs:["supplier_id","supplier_name","region","rating"],desc:"部品の供給元。rating は R04（低評価）と R05（代替候補）の入力。"},
+  BomLine:{x:380,y:110,t:"r",ja:"部品表行",attrs:["bom_id","quantity"],desc:"製品と部品の多対多を担うレコード。"},
+  Product:{x:600,y:110,t:"m",ja:"製品",attrs:["product_id","product_name","category","unit_price"],desc:"CQ01・CQ07 の起点。"},
+  Defect:{x:820,y:250,t:"r",ja:"不良・クレーム",attrs:["defect_id","defect_type","reported_date","severity"],desc:"R01 の分子（不良ロット数）の元データ。"},
+  Purchase:{x:160,y:260,t:"r",ja:"購買（部品ロット）",attrs:["purchase_id","purchase_date","quantity","part_lot_no"],desc:"部品とサプライヤーを結ぶ。"},
+  PartConsumption:{x:380,y:260,t:"r",ja:"ロット部品消費",attrs:["lp_id","quantity_used"],desc:"製造ロットがどの部品ロットを消費したか。トレースの要。"},
+  Part:{x:160,y:420,t:"m",ja:"部品",attrs:["part_id","part_name","part_type","unit"],desc:"part_type は R05 の代替条件に使う。"},
+  Lot:{x:600,y:400,t:"r",ja:"製造ロット",attrs:["lot_id","start_date","end_date","quantity","status"],desc:"グラフのハブ。R01〜R03 の判定対象。"},
+  Order:{x:820,y:400,t:"r",ja:"受注・出荷",attrs:["order_id","order_date","due_date","ship_date","quantity"],desc:"出荷先の影響範囲を辿る。"},
+  Customer:{x:1040,y:400,t:"m",ja:"顧客",attrs:["customer_id","customer_name","industry","region"],desc:"CQ02 の起点。"},
+  Spec:{x:160,y:600,t:"m",ja:"規格要件",attrs:["spec_id","spec_name","parameter","min_value","max_value","unit"],desc:"部品の適用規格と検査の基準。"},
+  Inspection:{x:380,y:600,t:"r",ja:"検査結果",attrs:["inspection_id","measured_value","result","inspected_at"],desc:"result=NG が R03 の入力。"},
+  Operation:{x:600,y:600,t:"r",ja:"工程実績",attrs:["op_id","process_name","sequence_no","started_at"],desc:"ロットと設備を結ぶ。"},
+  Equipment:{x:820,y:600,t:"m",ja:"設備",attrs:["equipment_id","equipment_name","line","install_date","maint_interval_days"],desc:"maint_interval_days が R02 の設備別閾値。"},
+  Maintenance:{x:1040,y:600,t:"r",ja:"保全履歴",attrs:["maint_id","maint_date","maint_type","downtime_hours"],desc:"R02 はロット開始日以前の最終保全のみを使う。"},
+  Evidence:{x:1280,y:190,t:"e",ja:"判定根拠",attrs:["conclusion","observedValue","observedNumerator","observedDenominator","appliedThreshold","undeterminedReason","evaluatedAt","explanation"],desc:"結論・適用ルール・根拠事実を1ノードにまとめる。判定クエリが CLEAR → INSERT で生成。explanation はスキーマ上の定義のみで、説明文は画面で都度生成し保存しない。"},
+  Rule:{x:1280,y:430,t:"u",ja:"判断ルール",attrs:["rule_id","rule_name","description","threshold","threshold_unit","comparison","numerator_label","denominator_label","min_denominator","conclusion","target_class"],desc:"閾値・比較方向・測定値の意味・最小標本数をデータとして持つ。R01〜R08 の8件。判定クエリがあるのは R01〜R03・R05（R04 は R05 の前提条件として使う）。"}
+};
+const E = [
+  ["Purchase","Supplier","purchasedFrom"],["Purchase","Part","purchasedPart"],["Part","Spec","hasSpec"],
+  ["PartConsumption","Purchase","consumedPurchase"],["PartConsumption","Lot","consumedInLot"],
+  ["BomLine","Product","bomProduct"],["BomLine","Part","bomPart"],["Lot","Product","lotProduct"],
+  ["Operation","Lot","opLot"],["Operation","Equipment","opEquipment"],["Maintenance","Equipment","maintainedEquipment"],
+  ["Inspection","Lot","inspectedLot"],["Inspection","Spec","inspectedSpec"],
+  ["Order","Lot","shippedLot"],["Order","Customer","orderCustomer"],["Order","Product","orderProduct"],
+  ["Defect","Lot","defectLot"],["Defect","Customer","defectCustomer"],["Evidence","Rule","evidenceRule"],
+  ["Lot","Supplier","lotUsesSupplier","chain",-70],["Lot","Equipment","lotMadeOn","chain",-40],["Part","Supplier","partSuppliedBy","chain",-95]
+];
+const CHAIN_DEF = {lotUsesSupplier:"consumedInLot⁻¹ ∘ consumedPurchase ∘ purchasedFrom",lotMadeOn:"opLot⁻¹ ∘ opEquipment",partSuppliedBy:"purchasedPart⁻¹ ∘ purchasedFrom"};
+
+const TYPES = {t1:"辿る",t2:"数える",t3:"判断する",t4:"基準を問う"};
+const CQ = [
+ {id:"CQ01",t:"t1",title:"製品の部品と供給元",q:"製品 P001（既定値）は何の部品でできていて、誰が供給しているか",
+  see:["部品と供給元の一覧（部品名・サプライヤー名）","P001 は部品4種・8行。部品 PT002（シール 02）の供給元に、評価2の S005 ミナト金属が含まれる"],
+  learn:"問題の出発点。S005 の部品が製品に入り込んでいる事実。",
+  form:"結果テーブル",edges:["bomProduct","bomPart","purchasedPart","purchasedFrom"]},
+ {id:"CQ02",t:"t1",title:"クレームの遡り",q:"顧客 C001（既定値）のクレームは、どのロット・工程・部品・サプライヤーに遡れるか",
+  see:["クレームごとに、ロット・製造設備・部品の供給元が1行に並ぶ","C001 のクレームは2件。D001 は L0001・設備 E001・S005 ミナト金属に遡る","工程と部品そのものは出力されない（問いとの差）"],
+  learn:"顧客側から出発して、製造設備と供給元まで一度に遡れる。導出プロパティ（近道）を使うため、部品消費や購買を経由せずに辿っている。",
+  form:"結果テーブル",edges:["defectCustomer","defectLot","lotMadeOn","lotUsesSupplier"]},
+ {id:"CQ03",t:"t1",title:"影響範囲",q:"サプライヤー S005（既定値）の部品を使った製品は、どの顧客に出荷済みか",
+  see:["S005 の部品を使った製品と出荷先顧客の組み合わせ（重複除去）。22組"],
+  learn:"回収や連絡が必要な範囲。CQ02 と同じ近道 lotUsesSupplier を逆向きに使っている。",
+  form:"結果テーブル",edges:["lotUsesSupplier","lotProduct","shippedLot","orderCustomer"]},
+ {id:"CQ04",t:"t2",title:"サプライヤー別・部品別の不良率",q:"どのサプライヤーのどの部品を使ったロットで、不良が多いか",
+  see:["サプライヤー×部品ごとの、ロット数・不良件数・不良率と R01 の閾値を並べた表（閾値以上の18行）","18行中9行が S005 の部品"],
+  learn:"問題が偶然でなく傾向であること。R01 の判定の元になる数字を、判定前の素の状態で確認できる。",
+  form:"集計テーブル",edges:["consumedInLot","consumedPurchase","purchasedPart","purchasedFrom","defectLot"],nodes:["Rule"]},
+ {id:"CQ05",t:"t2",title:"保全から次の不良まで",q:"設備別に、保全を実施してから次の不良が発生するまでの間隔はどれくらいか",
+  see:["保全1回ごとに、その設備で次に報告された不良の日付を並べた表","設備別の平均日数は、このテーブルから SPARQL の外で計算している"],
+  learn:"保全から不良までの間隔を設備ごとに見ることで、保全が品質に効いているかを確かめる材料になる。原因候補がサプライヤーだけでなく設備にもあることを示す。",
+  form:"集計テーブル",edges:["maintainedEquipment","lotMadeOn","defectLot"]},
+ {id:"CQ06",t:"t3",title:"ロットの判定と理由",q:"ロット L0003（既定値）は問題か。なぜそう言えるか",
+  see:["出荷保留（R03）：検査 I003 の測定値 105.77Ω が抵抗規格の上限 105Ω を超え NG",
+       "要注意（R01）：使用部品の供給元ミナト金属の不良率 16/20 = 0.80（閾値 0.05）",
+       "判定不能（R02）：ロット開始日以前の保全記録がない",
+       "上記を経路の順に文章化した説明文"],
+  learn:"結論の一つ一つが、グラフ上の実在する繋がりで裏付けられている。説明文の主張と経路グラフの辺が対応する。判定できなかったことも理由付きで示す。このデモの本題。",
+  form:"経路グラフ＋説明文",edges:["evidenceRule","meta","inspectedLot","inspectedSpec","consumedInLot","consumedPurchase","purchasedFrom","opLot","opEquipment","maintainedEquipment"]},
+ {id:"CQ07",t:"t3",title:"原因候補の順位",q:"製品 P001（既定値）の不良の原因候補は何か",
+  see:["原因候補（サプライヤー・設備）ごとの該当ロット数、該当ルール、ロット一覧","P001 では E003 組立ライン #3 と S005 ミナト金属が、ともに2ロットで同率1位","候補のロットから CQ06 の経路に移れる"],
+  learn:"個々のロットの判定を製品単位で束ねると、どこから手を打つべきかが見える。新たな判定はせず、CQ06 の判定結果（Evidence）を集計しているだけ。",
+  form:"順位テーブル（CQ06 へ遷移）",edges:["lotProduct","meta","evidenceRule"],nodes:["Supplier","Equipment"]},
+ {id:"CQ08",t:"t3",title:"代替サプライヤーの推奨",q:"低評価サプライヤーから買っている部品を、誰から買い替えられるか（対象は部品）",
+  see:["条件：現行の供給元が評価3未満（R04）、代替は同一規格・同一部品種別・不良率3%以下・5ロット以上の実績（R05）",
+       "条件をすべて満たすのは PT014 のみ。現行 S005 に対し、代替 S006（0/7）",
+       "既定値の PT013 は候補0件。デモでは PT014 を選ぶ"],
+  learn:"推奨にも根拠経路が付く。条件を厳しくすると候補が消えること自体が答えになる（「推奨できない」も説明可能な結論）。",
+  form:"経路グラフ＋説明文",edges:["hasSpec","partSuppliedBy","evidenceRule","meta"],nodes:["Part","Spec","Supplier"]},
+ {id:"CQ09",t:"t3",unimpl:true,title:"納期遅延リスク（未実装）",q:"受注 O001（既定値）が納期遅延するリスクの理由は何か",
+  see:["cq09.rq は存在するが、R06 の判定クエリがないためアプリでは選べない"],
+  learn:"CQ06 と同じ型（判定と経路）の繰り返しのため、予行練習では省略した。",
+  form:"—",edges:["shippedLot","lotMadeOn"],nodes:["Rule"]},
+ {id:"CQ10",t:"t4",title:"閾値を変えたら（タブ2）",q:"R01 の閾値を変えると、判定が変わるロットはどれか",
+  see:["タブ2で閾値を変更し、変更前のみ／両方／変更後のみの3列で差分を表示","R01 を 0.05 → 0.30 にすると判定ありロットが 64 → 41 に減り、L0048 から R01 の判定が外れて経路グラフが縮む","cq10.rq（既定 0.10）は単体のクエリとして残っているが、アプリではタブ2が役割を担う"],
+  learn:"結論は閾値という人間が決めた基準に依存する。経路で説明できるからこそ、基準の妥当性を議論の俎上に載せられる。",
+  form:"判定の差分一覧",edges:["evidenceRule","meta","consumedInLot","consumedPurchase","purchasedFrom","defectLot"]}
+];
+
+const NS="http://www.w3.org/2000/svg", svg=document.getElementById("g");
+const mk=(tag,attrs={},parent=svg)=>{const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);parent.appendChild(e);return e;};
+const defs=mk("defs");
+[["arr","var(--edge)"],["arrc","var(--chain)"],["arrh","var(--hl)"]].forEach(([id,col])=>{
+  const m=mk("marker",{id,viewBox:"0 0 10 10",refX:"9",refY:"5",markerWidth:"7",markerHeight:"7",orient:"auto-start-reverse"},defs);
+  mk("path",{d:"M0,0 L10,5 L0,10 z",fill:col},m);
+});
+mk("rect",{class:"zone",x:60,y:52,width:1080,height:612,rx:14});
+mk("text",{class:"zlabel",x:76,y:44}).textContent="事実層（15ソース → urn:src:*）";
+mk("rect",{class:"zone",x:1180,y:52,width:200,height:612,rx:14});
+mk("text",{class:"zlabel",x:1196,y:44}).textContent="説明層";
+
+function clip(a,b){const dx=b.x-a.x,dy=b.y-a.y;const sx=dx===0?Infinity:(W/2+4)/Math.abs(dx),sy=dy===0?Infinity:(H/2+4)/Math.abs(dy);const s=Math.min(sx,sy);return{x:a.x+dx*s,y:a.y+dy*s};}
+const edgeEls=[], gEdges=mk("g");
+E.forEach(([f,t,label,kind,bend])=>{
+  const A=C[f],B=C[t],g=mk("g",{class:"edge"+(kind==="chain"?" chain":"")},gEdges);
+  let d,lx,ly;
+  if(bend){const mx=(A.x+B.x)/2,my=(A.y+B.y)/2,dx=B.x-A.x,dy=B.y-A.y,L=Math.hypot(dx,dy);const cx=mx+(-dy/L)*bend*2,cy=my+(dx/L)*bend*2;const p1=clip(A,{x:cx,y:cy}),p2=clip(B,{x:cx,y:cy});d=`M${p1.x},${p1.y} Q${cx},${cy} ${p2.x},${p2.y}`;lx=.25*p1.x+.5*cx+.25*p2.x;ly=.25*p1.y+.5*cy+.25*p2.y;}
+  else{const p1=clip(A,B),p2=clip(B,A);d=`M${p1.x},${p1.y} L${p2.x},${p2.y}`;lx=(p1.x+p2.x)/2;ly=(p1.y+p2.y)/2;}
+  const path=mk("path",{d,"marker-end":`url(#${kind==="chain"?"arrc":"arr"})`},g);
+  const bg=mk("rect",{class:"lbg",rx:3},g);
+  const tx=mk("text",{x:lx,y:ly+3.5,"text-anchor":"middle"},g);tx.textContent=label;
+  requestAnimationFrame(()=>{const bb=tx.getBBox();bg.setAttribute("x",bb.x-3);bg.setAttribute("y",bb.y-1);bg.setAttribute("width",bb.width+6);bg.setAttribute("height",bb.height+2);});
+  edgeEls.push({f,t,label,kind,g,path});
+});
+const ev=C.Evidence,gE=mk("g",{class:"edge"},gEdges);
+const mp=mk("path",{d:`M${ev.x-W/2-4},${ev.y+6} L1146,${ev.y+6}`,"marker-end":"url(#arr)","stroke-dasharray":"3 3"},gE);
+[["evidenceSubject",-14],["evidenceFact",-2],["→ 任意の事実ノード",24]].forEach(([s,dy])=>{mk("text",{x:1163,y:ev.y+dy,"text-anchor":"middle"},gE).textContent=s;});
+edgeEls.push({f:"Evidence",t:"*",label:"meta",kind:"meta",g:gE,path:mp});
+mk("text",{x:ev.x,y:ev.y+52,"text-anchor":"middle",class:"zlabel","font-size":"10.5"}).textContent="⊒ alternativePart, alternativeSupplier";
+
+const nodeEls={};
+Object.entries(C).forEach(([id,n])=>{
+  const g=mk("g",{class:`node ${n.t}`,tabindex:"0",role:"button","aria-label":`${id} ${n.ja}`});
+  mk("rect",{x:n.x-W/2,y:n.y-H/2,width:W,height:H},g);
+  mk("text",{class:"en",x:n.x,y:n.y-3,"text-anchor":"middle"},g).textContent=id;
+  mk("text",{class:"ja",x:n.x,y:n.y+15,"text-anchor":"middle"},g).textContent=n.ja;
+  g.addEventListener("click",()=>selectClass(id));
+  g.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();selectClass(id);}});
+  nodeEls[id]=g;
+});
+
+const tg=document.getElementById("tgChain");
+const visible=e=>e.kind!=="chain"||tg.checked;
+function paint(onEdges,selNode,extra=[]){
+  const linked=new Set(selNode?[selNode]:[]);extra.forEach(x=>linked.add(x));
+  edgeEls.forEach(e=>{
+    e.g.style.display=visible(e)?"":"none";
+    const on=visible(e)&&onEdges(e);
+    e.g.classList.toggle("hl",on);e.g.classList.toggle("dim",!on);
+    if(e.path)e.path.setAttribute("marker-end",`url(#${on?"arrh":(e.kind==="chain"?"arrc":"arr")})`);
+    if(on){linked.add(e.f);if(e.t!=="*")linked.add(e.t);}
+  });
+  Object.entries(nodeEls).forEach(([k,g])=>{g.classList.toggle("sel",k===selNode);g.classList.toggle("dim",!linked.has(k));});
+}
+let state={mode:"cq",id:"CQ06"};
+const panel=document.getElementById("panel");
+function selectClass(id){
+  state={mode:"class",id};
+  paint(e=>e.f===id||e.t===id,id);
+  setChip(null);
+  const n=C[id];
+  const out=edgeEls.filter(e=>e.f===id&&visible(e)), inc=edgeEls.filter(e=>e.t===id&&visible(e));
+  const nm=e=>e.label==="meta"?"evidenceSubject / evidenceFact":e.label;
+  const li=(e,dir)=>`<li><code>ex:${nm(e)}</code> ${dir==="out"?"→ "+(e.t==="*"?"任意":e.t):"← "+e.f}${e.kind==="chain"?`<br><span style="color:var(--ink-2);font-size:.8rem">${CHAIN_DEF[e.label]}</span>`:""}</li>`;
+  const used=CQ.filter(q=>(q.nodes||[]).includes(id)||edgeEls.some(e=>(e.f===id||e.t===id)&&q.edges.includes(e.label))).map(q=>q.id).join("、");
+  panel.innerHTML=`<p class="sub">クラス</p><h3><code>ex:${id}</code></h3><p class="sub">${n.ja}</p><p>${n.desc}</p>
+    <h4>このクラスを通る CQ</h4><p>${used||"なし"}</p>
+    <h4>データタイププロパティ</h4><ul>${n.attrs.map(a=>`<li><code>ex:${a}</code></li>`).join("")}</ul>
+    <h4>出ていく関係</h4><ul>${out.length?out.map(e=>li(e,"out")).join(""):"<li>なし</li>"}</ul>
+    <h4>入ってくる関係</h4><ul>${inc.length?inc.map(e=>li(e,"in")).join(""):"<li>なし</li>"}</ul>`;
+  highlightCard(null);
+}
+function selectCQ(id){
+  state={mode:"cq",id};
+  const q=CQ.find(x=>x.id===id);
+  paint(e=>q.edges.includes(e.label),null,q.nodes||[]);
+  setChip(id);
+  panel.innerHTML=`<p class="sub"><span class="tag ${q.t}">${TYPES[q.t]}</span>　${q.form}</p>
+    <h3>${q.id}　${q.title}</h3>${q.unimpl?'<p class="sub">アプリでは未実装</p>':""}
+    <h4>問い</h4><p>${q.q}</p>
+    <h4>見えるもの</h4><ul>${q.see.map(s=>`<li>${s}</li>`).join("")}</ul>
+    <h4>分かること</h4><p class="learn">${q.learn}</p>
+    <h4>辿る関係</h4><ul>${q.edges.map(l=>`<li><code>ex:${l==="meta"?"evidenceSubject / evidenceFact":l}</code>${CHAIN_DEF[l]?' <span style="color:var(--ink-2);font-size:.8rem">（導出）</span>':""}</li>`).join("")}</ul>`;
+  highlightCard(id);
+}
+tg.addEventListener("change",()=>state.mode==="cq"?selectCQ(state.id):selectClass(state.id));
+
+const chips=document.getElementById("chips");
+CQ.forEach(q=>{const b=document.createElement("button");b.className="chip";b.dataset.id=q.id;b.setAttribute("aria-pressed","false");b.innerHTML=`<span class="n">${q.id}</span>${q.title}`;if(q.unimpl)b.style.borderStyle="dashed";b.addEventListener("click",()=>selectCQ(q.id));chips.appendChild(b);});
+function setChip(id){chips.querySelectorAll(".chip").forEach(b=>b.setAttribute("aria-pressed",b.dataset.id===id?"true":"false"));}
+
+const cards=document.getElementById("cards");
+CQ.forEach(q=>{
+  const c=document.createElement("article");c.className="card"+(q.unimpl?" unimpl":"");c.id="card-"+q.id;
+  c.innerHTML=`<div class="hd"><span class="tag ${q.t}">${TYPES[q.t]}</span><span class="id">${q.id}</span><h3>${q.title}</h3></div>
+    <p class="q">${q.q}</p>
+    <dl><dt>答えの形</dt><dd>${q.form}</dd><dt>見えるもの</dt><dd><ul>${q.see.map(s=>`<li>${s}</li>`).join("")}</ul></dd></dl>
+    <p class="learn"><strong>分かること</strong>　${q.learn}</p>
+    <button type="button">図で経路を見る</button>`;
+  c.querySelector("button").addEventListener("click",()=>{selectCQ(q.id);document.getElementById("diagram").scrollIntoView();});
+  cards.appendChild(c);
+});
+function highlightCard(id){document.querySelectorAll(".card").forEach(c=>c.classList.toggle("focus",c.id==="card-"+id));}
+
+selectCQ("CQ06");
+</script>
+</body>
+</html>
