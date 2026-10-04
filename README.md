@@ -9,6 +9,60 @@
 
 ## 構成
 
+```mermaid
+flowchart LR
+    subgraph SRC["データソース"]
+        XLSX["data/kg_toolkit.xlsx<br/>15 データシート + rules"]
+    end
+
+    subgraph ONT["ontology/"]
+        SCHEMA["schema.ttl<br/>OWL/RDFS・文型"]
+        SHAPES["shapes.ttl<br/>SHACL"]
+    end
+
+    subgraph ETL["投入（uv run src/load.py）"]
+        CONV["scripts/xlsx_to_rdf.py<br/>xlsx → TriG"]
+        VAL{"SHACL 検証<br/>pyshacl"}
+        LOAD["Graph Store Protocol<br/>で PUT"]
+        MAT["queries/materialize_*.rq<br/>導出プロパティの実体化"]
+        EVAL["src/evidence.py<br/>queries/evidence_r0*.rq"]
+    end
+
+    subgraph FUSEKI["Apache Jena Fuseki（TDB2, :3030/kg）"]
+        KG[("名前付きグラフ<br/>ARCHITECTURE.md の図2")]
+    end
+
+    subgraph APP["Streamlit アプリ（uv run streamlit run src/app.py, :8501）"]
+        UI["src/app.py + src/ui/<br/>タブ1 質問する / タブ2 閾値を変える / タブ3 グラフを見る"]
+        FQ["src/fuseki.py<br/>queries/*.rq を読んで実行"]
+        VIZ["src/viz.py<br/>pyvis で根拠経路グラフ"]
+        LLM["src/llm.py<br/>prompts/*.md"]
+    end
+
+    CLAUDE["Claude API<br/>説明文生成・自然文→SPARQL"]
+    DOCS["docs/ontology_and_cq.html<br/>オントロジーと CQ の解説（静的）"]
+    USER(("利用者<br/>ブラウザ"))
+
+    XLSX --> CONV --> VAL
+    SCHEMA --> CONV
+    SHAPES --> VAL
+    VAL -- "準拠" --> LOAD
+    VAL -. "違反: 投入せず停止" .-> STOP["exit 1"]
+    SCHEMA --> LOAD
+    LOAD --> KG
+    MAT --> KG
+    EVAL --> KG
+
+    USER --> UI
+    USER --> DOCS
+    UI --> FQ <--> KG
+    UI --> VIZ
+    UI --> LLM --> CLAUDE
+    UI -- "再判定 / what-if" --> EVAL
+```
+
+各要素の詳細、名前付きグラフの層、判定から説明文までのシーケンスは [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) を参照。
+
 | 要素 | 役割 |
 | --- | --- |
 | Apache Jena Fuseki（TDB2） | RDF ストアと SPARQL エンドポイント。データソースごとに名前付きグラフで管理する |
@@ -95,6 +149,7 @@ uv run streamlit run src/app.py
 
 ## ドキュメント
 
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：アーキテクチャ図（全体構成、名前付きグラフの層、判定から説明文までのシーケンス）
 - [docs/DEMO.md](docs/DEMO.md)：デモ手順書。事前準備、CQ の進行台本と期待される結果、トラブル対処
 - [docs/ontology_and_cq.html](docs/ontology_and_cq.html)：オントロジーとコンピテンシークエスチョン（CQ）の読み方。CQ を選ぶとオントロジー概念図上で経路を強調する（ブラウザで開く）
 - [ontology/README.md](ontology/README.md)：名前空間・URI・名前付きグラフの設計規約
